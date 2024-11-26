@@ -6,7 +6,7 @@ Released under the MIT license
 from environs import Env
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.common import StaleElementReferenceException
+from selenium.common import StaleElementReferenceException, TimeoutException
 from selenium.webdriver import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -22,31 +22,6 @@ import regex
 
 env = Env()
 env.read_env()
-
-
-def get_content(driver, url):
-    driver.get(url)
-    # scroll_to_bottom(driver)
-    sleep(5)
-    return driver.page_source
-
-
-# function to handle dynamic page content loading - using Selenium
-# def scroll_to_bottom(driver):
-#     # define initial page height for 'while' loop
-#     last_height = driver.execute_script("return document.body.scrollHeight")
-#     while True:
-#         driver.execute_script("window.scrollBy(0, document.body.scrollHeight/3);")
-#         """if "skuId" in url:
-#             expand_info(driver, "css-1n34gja eanm77i0")
-#             expand_info(driver, "css-1o99c9n eanm77i0")"""
-#         new_height = driver.execute_script("return document.body.scrollHeight")
-#         print("New height: ", new_height)
-#         if new_height == last_height:
-#             break
-#         else:
-#             last_height = new_height
-#             sleep(5)
 
 
 # def get_product_links(a_tags):
@@ -89,20 +64,42 @@ def get_content(driver, url):
 #         in_history(url)
 
 
+def get_content(driver, url):
+    driver.get(url)
+    # scroll_to_bottom(driver)
+    sleep(5)
+    return driver.page_source
+
+
+# function to handle dynamic page content loading - using Selenium
+def scroll_to_bottom(driver):
+    # define initial page height for 'while' loop
+    last_height = driver.execute_script("return document.body.scrollHeight")
+    while True:
+        driver.execute_script("window.scrollBy(0, document.body.scrollHeight/3);")
+        """if "skuId" in url:
+            expand_info(driver, "css-1n34gja eanm77i0")
+            expand_info(driver, "css-1o99c9n eanm77i0")"""
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        print("New height: ", new_height)
+        if new_height == last_height:
+            break
+        else:
+            last_height = new_height
+            sleep(5)
+
+
 def get_posts(driver, url):
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
     main_page_dom = get_content(driver, url)
-
-    print(url)
+    wait = WebDriverWait(driver, 10)
     soup = BeautifulSoup(main_page_dom, 'html.parser')
-    script = (soup.find('script', charset=True))
-    charset = script['charset']
 
     # Get feed
-    feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
-    print(feed['aria-label'])
     # feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
+    feed = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'article')))
+    print(feed)
 
     # # Sets a list of pictures
     # pictures_found = soup.find_all('img', class_='css-1rovmyu e65zztl0')
@@ -118,23 +115,13 @@ def get_posts(driver, url):
     # write_to_csv(url, name, "Maquillage", price, pros, description, ingredients, how_to_use, pictures)
 
 
-# def drv_click_btn_by_label(btns, label):
-#     click = False
-#     for btn in btns:
-#         if label in btn.text:
-#             btn.click()
-#             click = True
-#             break
-#     return click
-
-# def get_btn(btns, label):
-#     b = False
-#     for btn in btns:
-#         if label in btn.text:
-#             btn.click()
-#             b = btn
-#             break
-#     return b
+def send_password(wait):
+    sleep(random.uniform(1, 3))
+    password_field = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]')))
+    sleep(random.uniform(1, 3))
+    password_field.send_keys(env.str('PASSWORD'))
+    sleep(random.uniform(1, 3))
+    password_field.send_keys(Keys.ENTER)
 
 
 def login(driver):
@@ -149,20 +136,22 @@ def login(driver):
         # Input the username
         sleep(random.uniform(1, 3))
         username.send_keys(env.str('USERNAME'))
+        sleep(random.uniform(1, 3))
         username.send_keys(Keys.ENTER)
 
-        # Get the password field and
-        sleep(random.uniform(1, 3))
-        password_field = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]')))
-        sleep(random.uniform(1, 3))
-        password_field.send_keys(env.str('PASSWORD'))
-        sleep(random.uniform(1, 3))
-        password_field.send_keys(Keys.ENTER)
+        send_password(wait)
 
         return True
 
-    except StaleElementReferenceException as sere:
-        print(sere)
+    except (StaleElementReferenceException, TimeoutException) as _:
+
+        contact_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'r-30o5oe')))
+        contact_field.send_keys(env.str('CONTACT'))
+        sleep(random.uniform(1, 3))
+        contact_field.send_keys(Keys.ENTER)
+
+        send_password(wait)
+
         return False
 
 
