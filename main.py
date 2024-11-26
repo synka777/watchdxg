@@ -141,10 +141,8 @@ def login(driver):
 
         send_password(wait)
 
-        return True
-
     except (StaleElementReferenceException, TimeoutException) as _:
-
+        print('Working around suspicious activity detection...')
         contact_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'r-30o5oe')))
         contact_field.send_keys(env.str('CONTACT'))
         sleep(random.uniform(1, 3))
@@ -152,7 +150,8 @@ def login(driver):
 
         send_password(wait)
 
-        return False
+    sleep(random.uniform(1, 3))
+    return True
 
 
 def main():
@@ -179,6 +178,7 @@ def main():
     for url in adv_search_urls:
         if login(driver):
             print('Successfully logged in!')
+            get_posts(driver, url)
     # posts = get_posts(driver, url)
     # print(product.encode('utf-8'))
     # if not in_history(href, True):
