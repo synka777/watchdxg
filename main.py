@@ -98,21 +98,27 @@ def get_posts(driver, url):
 
     # Get feed
     # feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
-    feed = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'article')))
-    print(feed)
+    sleep(random.uniform(1, 3))
 
-    # # Sets a list of pictures
-    # pictures_found = soup.find_all('img', class_='css-1rovmyu e65zztl0')
-    # pictures = []
-    # for picture_link in pictures_found:
-    #     prefix = "https://www.sephora.com"
-    #     if prefix not in picture_link:
-    #         picture_link = f"{prefix}{picture_link['src']}"
-    #     # print("Picture: ", picture['src'] + "\n")
-    #     pictures.append(picture_link)
+    for a in soup.findAll('article', {'data-testid': 'tweet'}):
+        print('')
+        # posted_by_at_grp is a bunch of nested elements that stores the username, handle and datetime
+        posted_by_at_grp = a.select('div', {'data-testid': 'User-Name'})[0]
+        display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text
+        user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text
+        timestamp = posted_by_at_grp.select('time')[0]['datetime']
+
+        # For some reason, tweet_text includes an unwanted string like below therefore we remove it
+        string_to_remove = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
+        tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(string_to_remove, '')
+
+        print(f'Handle: {display_name}')
+        print(f'DisplayName: {user_handle}')
+        print(f'TimeStamp: {timestamp}')
+        print(f'tweet_text: {tweet_text}')
 
     # Writes the info found for the product in a CSV file
-    # write_to_csv(url, name, "Maquillage", price, pros, description, ingredients, how_to_use, pictures)
+    # write_to_csv()
 
 
 def send_password(wait):
@@ -141,7 +147,8 @@ def login(driver):
 
         send_password(wait)
 
-    except (StaleElementReferenceException, TimeoutException) as _:
+    except (StaleElementReferenceException, TimeoutException) as e:
+        print(e)
         print('Working around suspicious activity detection...')
         contact_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'r-30o5oe')))
         contact_field.send_keys(env.str('CONTACT'))
@@ -156,7 +163,7 @@ def login(driver):
 
 def main():
     adv_search_urls = [
-        "https://x.com/search?q=\"list\" (from:upbitglobal)"
+        "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
     ]
 
     options = Options()
