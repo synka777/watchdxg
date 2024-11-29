@@ -24,6 +24,14 @@ env = Env()
 env.read_env()
 
 
+class Post:
+    def __init__(self, post_id: str, user_pseudonym: str, user_handle: str, text: str):
+        self.post_id = post_id
+        self.user_pseudonym = user_pseudonym
+        self.user_handle = user_handle
+        self.text = text
+
+
 # def get_product_links(a_tags):
 #     links = []
 #     for a_tag in a_tags:
@@ -64,58 +72,57 @@ env.read_env()
 #         in_history(url)
 
 
-def get_content(driver, url):
-    driver.get(url)
-    # scroll_to_bottom(driver)
-    sleep(5)
-    return driver.page_source
-
-
 # function to handle dynamic page content loading - using Selenium
-def scroll_to_bottom(driver):
+def scroll(driver):
     # define initial page height for 'while' loop
     last_height = driver.execute_script("return document.body.scrollHeight")
-    while True:
-        driver.execute_script("window.scrollBy(0, document.body.scrollHeight/3);")
-        """if "skuId" in url:
-            expand_info(driver, "css-1n34gja eanm77i0")
-            expand_info(driver, "css-1o99c9n eanm77i0")"""
-        new_height = driver.execute_script("return document.body.scrollHeight")
-        print("New height: ", new_height)
-        if new_height == last_height:
-            break
-        else:
-            last_height = new_height
-            sleep(5)
+
+    driver.execute_script("window.scrollBy(0, document.body.scrollHeight/3);")
+    new_height = driver.execute_script("return document.body.scrollHeight")
+    print("New height: ", new_height)
+    if new_height == last_height:
+        return True
+    else:
+        return False
 
 
 def get_posts(driver, url):
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
-    main_page_dom = get_content(driver, url)
-    wait = WebDriverWait(driver, 10)
-    soup = BeautifulSoup(main_page_dom, 'html.parser')
+    driver.get(url)
+    sleep(3)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     # Get feed
     # feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
     sleep(random.uniform(1, 3))
+    batch = []
+    while True:
+        for a in soup.findAll('article', {'data-testid': 'tweet'}):
+            print('')
+            # posted_by_at_grp is a bunch of nested elements that stores the username, handle and datetime
+            posted_by_at_grp = a.select('div', {'data-testid': 'User-Name'})[0]
+            display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text
+            user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text
+            timestamp = posted_by_at_grp.select('time')[0]['datetime']
 
-    for a in soup.findAll('article', {'data-testid': 'tweet'}):
-        print('')
-        # posted_by_at_grp is a bunch of nested elements that stores the username, handle and datetime
-        posted_by_at_grp = a.select('div', {'data-testid': 'User-Name'})[0]
-        display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text
-        user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text
-        timestamp = posted_by_at_grp.select('time')[0]['datetime']
+            # For some reason, tweet_text includes an unwanted string like below therefore we remove it
+            string_to_remove = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
+            tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(string_to_remove, '')
 
-        # For some reason, tweet_text includes an unwanted string like below therefore we remove it
-        string_to_remove = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
-        tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(string_to_remove, '')
+            post = Post(timestamp, display_name, user_handle, tweet_text)
 
-        print(f'Handle: {display_name}')
-        print(f'DisplayName: {user_handle}')
-        print(f'TimeStamp: {timestamp}')
-        print(f'tweet_text: {tweet_text}')
+            if not any(saved_post.post_id == timestamp for saved_post in batch):
+                batch.append(post)
+                print(f'DisplayName: {display_name}')
+                print(f'Handle: {user_handle}')
+                print(f'TimeStamp: {timestamp}')
+                print(f'tweet_text: {tweet_text}')
+
+        # Get page content using driver before re-entering in the loop
+        rock_bottom = scroll(driver)
+        if rock_bottom:
+            break
 
     # Writes the info found for the product in a CSV file
     # write_to_csv()
@@ -131,7 +138,7 @@ def send_password(wait):
 
 
 def login(driver):
-    get_content(driver, "https://x.com/i/flow/login")
+    driver.get("https://x.com/i/flow/login")
     wait = WebDriverWait(driver, 10)
     try:
         # Get the username field
@@ -148,7 +155,7 @@ def login(driver):
         send_password(wait)
 
     except (StaleElementReferenceException, TimeoutException) as e:
-        print(e)
+        # TODO: handle Error window on username data-testid="confirmationSheetDialog"
         print('Working around suspicious activity detection...')
         contact_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'r-30o5oe')))
         contact_field.send_keys(env.str('CONTACT'))
@@ -163,7 +170,9 @@ def login(driver):
 
 def main():
     adv_search_urls = [
-        "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
+        # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
+        #'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
+        'https://x.com/hippie_dev'
     ]
 
     options = Options()
