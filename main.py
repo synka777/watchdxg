@@ -18,7 +18,7 @@ import os
 import random
 
 import csv
-import regex
+import re
 
 env = Env()
 env.read_env()
@@ -73,17 +73,10 @@ class Post:
 
 
 # function to handle dynamic page content loading - using Selenium
-def scroll(driver):
-    # define initial page height for 'while' loop
-    last_height = driver.execute_script("return document.body.scrollHeight")
-
-    driver.execute_script("window.scrollBy(0, document.body.scrollHeight/3);")
+def scroll(driver, last_height):
+    driver.execute_script("window.scrollBy(0, document.body.scrollHeight/6);")
     new_height = driver.execute_script("return document.body.scrollHeight")
-    print("New height: ", new_height)
-    if new_height == last_height:
-        return True
-    else:
-        return False
+    return new_height
 
 
 def get_posts(driver, url):
@@ -91,13 +84,15 @@ def get_posts(driver, url):
     # It then will return this map to the main function
     driver.get(url)
     sleep(3)
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     # Get feed
     # feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
     sleep(random.uniform(1, 3))
     batch = []
+    pos_history = [0]
+    height_pos = 0
     while True:
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
         for a in soup.findAll('article', {'data-testid': 'tweet'}):
             print('')
             # posted_by_at_grp is a bunch of nested elements that stores the username, handle and datetime
@@ -106,9 +101,16 @@ def get_posts(driver, url):
             user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text
             timestamp = posted_by_at_grp.select('time')[0]['datetime']
 
+            # stats_grp = a.select('span[data-testid="app-text-transition-container"]')
+            # replies = stats_grp[0].select('span span span')[0].text
+            # reposts = stats_grp[1].select('span span span')[0].text
+            # likes = stats_grp[2].select('span span span')[0].text
+            # views = stats_grp[3].select('span span span ')[0].text
+            # print('Replies',replies,'Reposts', reposts, 'Likes',likes, 'Views',views)
+
             # For some reason, tweet_text includes an unwanted string like below therefore we remove it
-            string_to_remove = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
-            tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(string_to_remove, '')
+            trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
+            tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
 
             post = Post(timestamp, display_name, user_handle, tweet_text)
 
@@ -118,11 +120,17 @@ def get_posts(driver, url):
                 print(f'Handle: {user_handle}')
                 print(f'TimeStamp: {timestamp}')
                 print(f'tweet_text: {tweet_text}')
-
-        # Get page content using driver before re-entering in the loop
-        rock_bottom = scroll(driver)
-        if rock_bottom:
+    
+        # Get the height_pos position and add it to the list of height_pos.
+        height_pos = scroll(driver, height_pos)
+        # If the new and last height_pos values are the same, then we've reached the bottom of the page.
+        print(pos_history[-1], height_pos)
+        if height_pos == pos_history[-1]:
             break
+        else:
+            pos_history.append(height_pos)
+        sleep(random.uniform(2, 4))
+    print('Done. Got ', len(batch), ' posts')
 
     # Writes the info found for the product in a CSV file
     # write_to_csv()
@@ -141,6 +149,7 @@ def login(driver):
     driver.get("https://x.com/i/flow/login")
     wait = WebDriverWait(driver, 10)
     try:
+        # TODO: Fix an issue where the username filed can't be selected or the username can't be sent
         # Get the username field
         sleep(random.uniform(1, 3))
         username = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[autocomplete="username"]')))
@@ -170,9 +179,8 @@ def login(driver):
 
 def main():
     adv_search_urls = [
-        # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
-        #'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
-        'https://x.com/hippie_dev'
+        "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
+        # 'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
     ]
 
     options = Options()
