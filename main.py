@@ -3,6 +3,7 @@ Copyright (c) 2024 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
+from classes import Post
 from environs import Env
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -22,14 +23,6 @@ import re
 
 env = Env()
 env.read_env()
-
-
-class Post:
-    def __init__(self, post_id: str, user_pseudonym: str, user_handle: str, text: str):
-        self.post_id = post_id
-        self.user_pseudonym = user_pseudonym
-        self.user_handle = user_handle
-        self.text = text
 
 
 # def get_product_links(a_tags):
@@ -73,10 +66,15 @@ class Post:
 
 
 # function to handle dynamic page content loading - using Selenium
-def scroll(driver, last_height):
+def scroll(driver):
     driver.execute_script("window.scrollBy(0, document.body.scrollHeight/6);")
     new_height = driver.execute_script("return document.body.scrollHeight")
     return new_height
+
+
+def get_stats(stats_grp, stat_pos):
+    subset = stats_grp[stat_pos].select('span span')
+    return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
 
 
 def get_posts(driver, url):
@@ -85,55 +83,57 @@ def get_posts(driver, url):
     driver.get(url)
     sleep(3)
 
-    # Get feed
-    # feed = soup.find('div', class_='css-175oi2r', attrs={"aria-label": True})
     sleep(random.uniform(1, 3))
     batch = []
     pos_history = [0]
-    height_pos = 0
     while True:
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        for a in soup.findAll('article', {'data-testid': 'tweet'}):
+        for post_element in soup.findAll('article', {'data-testid': 'tweet'}):
             print('')
-            # posted_by_at_grp is a bunch of nested elements that stores the username, handle and datetime
-            posted_by_at_grp = a.select('div', {'data-testid': 'User-Name'})[0]
+            # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, etc
+            posted_by_at_grp = post_element.select('div', {'data-testid': 'User-Name'})[0]
             display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text
             user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text
             timestamp = posted_by_at_grp.select('time')[0]['datetime']
+            href = posted_by_at_grp.select('div div div a')[-1]['href'].replace('/analytics', '')
+            post_id = href.split('/')[-1]
 
-            # stats_grp = a.select('span[data-testid="app-text-transition-container"]')
-            # replies = stats_grp[0].select('span span span')[0].text
-            # reposts = stats_grp[1].select('span span span')[0].text
-            # likes = stats_grp[2].select('span span span')[0].text
-            # views = stats_grp[3].select('span span span ')[0].text
-            # print('Replies',replies,'Reposts', reposts, 'Likes',likes, 'Views',views)
+            # stats_grp is a web element group composing the social interaction statistics
+            stats_grp = post_element.select('span[data-testid="app-text-transition-container"]')
+            replies = get_stats(stats_grp, 0)
+            reposts = get_stats(stats_grp, 1)
+            likes = get_stats(stats_grp, 2)
+            views = get_stats(stats_grp, 3) if len(stats_grp) > 3 else str(0)
 
-            # For some reason, tweet_text includes an unwanted string like below therefore we remove it
+            # For some reason, tweet_text includes unwanted strings, remove it
             trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
-            tweet_text = a.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
+            trim_tail_str = (replies + reposts + likes + views).replace('O', '')
 
-            post = Post(timestamp, display_name, user_handle, tweet_text)
+            tweet_text = post_element.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
+            if tweet_text.endswith(trim_tail_str):
+                tweet_text = tweet_text[: -len(trim_tail_str)]
+
+            post = Post(post_id, timestamp, href, display_name, user_handle, tweet_text, replies, reposts, likes, views)
 
             if not any(saved_post.post_id == timestamp for saved_post in batch):
                 batch.append(post)
+                print(f'post_id: {post_id}')
+                print(f'TimeStamp: {timestamp}')
+                print(f'href: {href}')
                 print(f'DisplayName: {display_name}')
                 print(f'Handle: {user_handle}')
-                print(f'TimeStamp: {timestamp}')
                 print(f'tweet_text: {tweet_text}')
-    
+                print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
+
         # Get the height_pos position and add it to the list of height_pos.
-        height_pos = scroll(driver, height_pos)
+        height_pos = scroll(driver)
         # If the new and last height_pos values are the same, then we've reached the bottom of the page.
-        print(pos_history[-1], height_pos)
         if height_pos == pos_history[-1]:
             break
         else:
             pos_history.append(height_pos)
         sleep(random.uniform(2, 4))
     print('Done. Got ', len(batch), ' posts')
-
-    # Writes the info found for the product in a CSV file
-    # write_to_csv()
 
 
 def send_password(wait):
