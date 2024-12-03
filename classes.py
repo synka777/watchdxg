@@ -6,6 +6,8 @@ class Post:
                  post_id: str,
                  timestamp: datetime,
                  href: str,
+                 is_reposted: bool,
+                 in_reply_to: list,
                  user_pseudonym: str,
                  user_handle: str,
                  text: str,
@@ -17,6 +19,8 @@ class Post:
         self.post_id = post_id
         self.timestamp = timestamp
         self.href = href
+        self.is_reposted = is_reposted,
+        self.in_reply_to = in_reply_to,
         self.user_pseudonym = user_pseudonym
         self.user_handle = user_handle
         self.text = text

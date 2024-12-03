@@ -81,7 +81,6 @@ def get_posts(driver, url):
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
     driver.get(url)
-    sleep(3)
 
     sleep(random.uniform(1, 3))
     batch = []
@@ -90,6 +89,23 @@ def get_posts(driver, url):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         for post_element in soup.findAll('article', {'data-testid': 'tweet'}):
             print('')
+            # Get the social context for the current post
+
+            # Is it a repost?
+            is_reposted = True if bool(post_element.select('span', {'data-testid': 'socialContext'})[0].select('span span span')) else False
+            # Is it a reply?
+            in_reply_to = []
+            # Case 1: handle posts that include "Replying to <someone>", happens when making an advanced search
+            reply_container = post_element.select('div div div div div div')[0].select('div a span')
+            repl = True if bool(reply_container[4].text.startswith('@')) else False
+
+            if repl:
+                in_reply_to.append(reply_container[4].text)
+                if reply_container[5].text.startswith('@') and len(in_reply_to) > 0:
+                    in_reply_to.append(reply_container[5].text)
+
+            # TODO: Case 2: handle posts that are directly displayed under the original post
+
             # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, etc
             posted_by_at_grp = post_element.select('div', {'data-testid': 'User-Name'})[0]
             display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text
@@ -113,13 +129,16 @@ def get_posts(driver, url):
             if tweet_text.endswith(trim_tail_str):
                 tweet_text = tweet_text[: -len(trim_tail_str)]
 
-            post = Post(post_id, timestamp, href, display_name, user_handle, tweet_text, replies, reposts, likes, views)
+            post = Post(post_id, timestamp, href, is_reposted, in_reply_to,
+                        display_name, user_handle, tweet_text, replies, reposts, likes, views)
 
             if not any(saved_post.post_id == timestamp for saved_post in batch):
                 batch.append(post)
                 print(f'post_id: {post_id}')
                 print(f'TimeStamp: {timestamp}')
                 print(f'href: {href}')
+                print(f'is_reposted: {is_reposted}')
+                print(f'in_reply_to: {" ".join(map(str, in_reply_to))}')
                 print(f'DisplayName: {display_name}')
                 print(f'Handle: {user_handle}')
                 print(f'tweet_text: {tweet_text}')
@@ -132,7 +151,7 @@ def get_posts(driver, url):
             break
         else:
             pos_history.append(height_pos)
-        sleep(random.uniform(2, 4))
+        sleep(random.uniform(4, 5))
     print('Done. Got ', len(batch), ' posts')
 
 
@@ -150,6 +169,7 @@ def login(driver):
     wait = WebDriverWait(driver, 10)
     try:
         # TODO: Fix an issue where the username filed can't be selected or the username can't be sent
+        # resulting to Sorry, we could not find your account
         # Get the username field
         sleep(random.uniform(1, 3))
         username = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[autocomplete="username"]')))
@@ -179,8 +199,9 @@ def login(driver):
 
 def main():
     adv_search_urls = [
-        "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
+        # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
         # 'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
+        'https://x.com/search?f=live&q=(from%3Abinance)%20filter%3Areplies'
     ]
 
     options = Options()
