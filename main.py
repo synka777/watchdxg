@@ -85,6 +85,7 @@ def get_posts(driver, url):
     sleep(random.uniform(1, 3))
     batch = []
     pos_history = [0]
+    i = 0
     while True:
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         for post_element in soup.findAll('article', {'data-testid': 'tweet'}):
@@ -92,17 +93,23 @@ def get_posts(driver, url):
             # Get the social context for the current post
 
             # Is it a repost?
-            is_reposted = True if bool(post_element.select('span', {'data-testid': 'socialContext'})[0].select('span span span')) else False
+            is_reposted = True if bool(
+                post_element.select('span', {'data-testid': 'socialContext'})[0].select('span span span')) else False
             # Is it a reply?
             in_reply_to = []
             # Case 1: handle posts that include "Replying to <someone>", happens when making an advanced search
             reply_container = post_element.select('div div div div div div')[0].select('div a span')
-            repl = True if bool(reply_container[4].text.startswith('@')) else False
 
-            if repl:
-                in_reply_to.append(reply_container[4].text)
-                if reply_container[5].text.startswith('@') and len(in_reply_to) > 0:
-                    in_reply_to.append(reply_container[5].text)
+            if len(reply_container) > 4:
+                for z in reply_container:
+                    print(z.text)
+                repl = True if bool(reply_container[4].text.startswith('@')) else False
+
+                if repl:
+                    in_reply_to.append(reply_container[4].text)
+                    if len(reply_container) > 5:
+                        if reply_container[5].text.startswith('@') and len(in_reply_to) > 0:
+                            in_reply_to.append(reply_container[5].text)
 
             # TODO: Case 2: handle posts that are directly displayed under the original post
 
@@ -122,7 +129,7 @@ def get_posts(driver, url):
             views = get_stats(stats_grp, 3) if len(stats_grp) > 3 else str(0)
 
             # For some reason, tweet_text includes unwanted strings, remove it
-            trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select('time')[0].text}'
+            trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select("time")[0].text}'
             trim_tail_str = (replies + reposts + likes + views).replace('O', '')
 
             tweet_text = post_element.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
@@ -134,6 +141,7 @@ def get_posts(driver, url):
 
             if not any(saved_post.post_id == timestamp for saved_post in batch):
                 batch.append(post)
+                print('NEW POST: ', i)
                 print(f'post_id: {post_id}')
                 print(f'TimeStamp: {timestamp}')
                 print(f'href: {href}')
@@ -143,7 +151,7 @@ def get_posts(driver, url):
                 print(f'Handle: {user_handle}')
                 print(f'tweet_text: {tweet_text}')
                 print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
-
+            i += 1
         # Get the height_pos position and add it to the list of height_pos.
         height_pos = scroll(driver)
         # If the new and last height_pos values are the same, then we've reached the bottom of the page.
@@ -200,8 +208,8 @@ def login(driver):
 def main():
     adv_search_urls = [
         # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
-        # 'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
-        'https://x.com/search?f=live&q=(from%3Abinance)%20filter%3Areplies'
+        'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
+        # 'https://x.com/search?f=live&q=(from%3Abinance)%20filter%3Areplies'
     ]
 
     options = Options()
