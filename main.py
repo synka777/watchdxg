@@ -18,8 +18,6 @@ from time import sleep
 import os
 import random
 
-import csv
-import re
 
 env = Env()
 env.read_env()
@@ -64,12 +62,22 @@ env.read_env()
 #         # Adds the URL corresponding to the processed product in the history
 #         in_history(url)
 
+def is_rock_bottom(driver):
+    return driver.execute_script("""
+            var scrollable = document.documentElement || document.body;
+            return (scrollable.scrollHeight - scrollable.scrollTop) <= scrollable.clientHeight;
+        """)
+
 
 # function to handle dynamic page content loading - using Selenium
 def scroll(driver):
     driver.execute_script("window.scrollBy(0, document.body.scrollHeight/6);")
     new_height = driver.execute_script("return document.body.scrollHeight")
     return new_height
+
+
+def clean_stat(stat):
+    return stat.replace('0', '') if stat.startswith('0') else stat
 
 
 def get_stats(stats_grp, stat_pos):
@@ -101,8 +109,6 @@ def get_posts(driver, url):
             reply_container = post_element.select('div div div div div div')[0].select('div a span')
 
             if len(reply_container) > 4:
-                for z in reply_container:
-                    print(z.text)
                 repl = True if bool(reply_container[4].text.startswith('@')) else False
 
                 if repl:
@@ -130,9 +136,10 @@ def get_posts(driver, url):
 
             # For some reason, tweet_text includes unwanted strings, remove it
             trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select("time")[0].text}'
-            trim_tail_str = (replies + reposts + likes + views).replace('O', '')
+            trim_tail_str = clean_stat(replies) + clean_stat(reposts) + clean_stat(likes) + clean_stat(views)
 
             tweet_text = post_element.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
+
             if tweet_text.endswith(trim_tail_str):
                 tweet_text = tweet_text[: -len(trim_tail_str)]
 
@@ -152,15 +159,44 @@ def get_posts(driver, url):
                 print(f'tweet_text: {tweet_text}')
                 print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
             i += 1
-        # Get the height_pos position and add it to the list of height_pos.
-        height_pos = scroll(driver)
-        # If the new and last height_pos values are the same, then we've reached the bottom of the page.
-        if height_pos == pos_history[-1]:
-            break
-        else:
-            pos_history.append(height_pos)
+
+        rock_bottom = False
+        retries = 1
+        max_retries = 3
+        error = False
+        while not rock_bottom:
+            # Get the height_pos position
+            height_pos = scroll(driver)
+
+            # If the new and last height_pos values are the same we might've reached the bottom of the page.
+            if height_pos == pos_history[-1]:
+                if not is_rock_bottom(driver):
+                    print(f'Same height position. Trying again... {retries}/{max_retries}')
+                    if retries < max_retries:
+                        retries += 1
+                        continue
+                    else:
+                        print('ERROR! Was unable to scroll any further')
+                        error = True
+                        break
+                else:
+                    rock_bottom = True
+            else:
+                # If we have moved, then add the current position into the height position history
+                pos_history.append(height_pos)
+                break
+            sleep(random.uniform(4, 5))
+
         sleep(random.uniform(4, 5))
-    print('Done. Got ', len(batch), ' posts')
+        # Exit posts retrieval
+        if rock_bottom:
+            print('Done. Got ', len(batch), ' posts')
+            break
+        if error:
+            break
+
+
+
 
 
 def send_password(wait):
@@ -208,8 +244,9 @@ def login(driver):
 def main():
     adv_search_urls = [
         # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
-        'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
+        # 'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
         # 'https://x.com/search?f=live&q=(from%3Abinance)%20filter%3Areplies'
+        'https://x.com/CopperheadSec'
     ]
 
     options = Options()
