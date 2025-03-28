@@ -3,19 +3,19 @@ from datetime import datetime
 
 class Post:
     def __init__(self,
-                 post_id: str,
-                 timestamp: datetime,
-                 href: str,
-                 is_reposted: bool,
-                 in_reply_to: list,
-                 user_pseudonym: str,
-                 user_handle: str,
-                 text: str,
-                 replies: int,
-                 reposts: int,
-                 likes: int,
-                 views: int
-                 ):
+            post_id: str,
+            timestamp: datetime,
+            href: str,
+            is_reposted: bool,
+            in_reply_to: list,
+            user_pseudonym: str,
+            user_handle: str,
+            text: str,
+            replies: int,
+            reposts: int,
+            likes: int,
+            views: int
+        ):
         self.post_id = post_id
         self.timestamp = timestamp
         self.href = href
