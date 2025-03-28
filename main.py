@@ -71,8 +71,8 @@ def is_rock_bottom(driver):
 
 # function to handle dynamic page content loading - using Selenium
 def scroll(driver):
-    driver.execute_script("window.scrollBy(0, document.body.scrollHeight/6);")
-    new_height = driver.execute_script("return document.body.scrollHeight")
+    driver.execute_script('window.scrollBy(0, document.body.scrollHeight/10);')
+    new_height = driver.execute_script('return document.body.scrollHeight')
     return new_height
 
 
@@ -161,21 +161,45 @@ def get_posts(driver, url):
             i += 1
 
         rock_bottom = False
-        retries = 1
+        retries = 0
         max_retries = 3
         error = False
         while not rock_bottom:
             # Get the height_pos position
             height_pos = scroll(driver)
+            if retries > 0:
+                print(f'Trying again... {retries}/{max_retries}')
+                body = driver.find_element(By.TAG_NAME, "body")
+                body.send_keys(Keys.PAGE_DOWN)
 
             # If the new and last height_pos values are the same we might've reached the bottom of the page.
             if height_pos == pos_history[-1]:
                 if not is_rock_bottom(driver):
-                    print(f'Same height position. Trying again... {retries}/{max_retries}')
-                    if retries < max_retries:
-                        retries += 1
-                        continue
-                    else:
+                    retries += 1
+                    print('Same height position')
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    print('Trying a blast to half the page...')
+                    print(driver.execute_script('return document.body.scrollHeight'))
+                    # driver.execute_script("""
+                    #     var lazyImages = document.querySelectorAll('img[data-src], video[data-src]');
+                    #     lazyImages.forEach(function(img) {
+                    #         img.src = img.getAttribute('data-src');
+                    #     });
+                    # """)
+                    # driver.execute_script("""
+                    #     // Hide potential blocking elements (e.g., ads, modals, etc.)
+                    #     var overlays = document.querySelectorAll('.ad, .modal, .sticky');
+                    #     overlays.forEach(function(element) {
+                    #         element.style.display = 'none';
+                    #     });
+                    # """)
+                    # driver.execute_script("""
+                    #     // Disable auto-refresh or prevent JavaScript-driven reloads
+                    #     window.onbeforeunload = null;
+                    #     window.location.reload = function(){};
+                    #     window.history.pushState({}, "", window.location.href);
+                    # """)
+                    if retries > max_retries:
                         print('ERROR! Was unable to scroll any further')
                         error = True
                         break
@@ -196,9 +220,6 @@ def get_posts(driver, url):
             break
 
 
-
-
-
 def send_password(wait):
     sleep(random.uniform(1, 3))
     password_field = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]')))
@@ -212,7 +233,7 @@ def login(driver):
     driver.get("https://x.com/i/flow/login")
     wait = WebDriverWait(driver, 10)
     try:
-        # TODO: Fix an issue where the username filed can't be selected or the username can't be sent
+        # TODO: Fix an issue where the username field can't be selected or the username can't be sent
         # resulting to Sorry, we could not find your account
         # Get the username field
         sleep(random.uniform(1, 3))
@@ -251,10 +272,10 @@ def main():
 
     options = Options()
     options.headless = False
-    options.set_preference("general.useragent.override",
-                           "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0")
-    options.set_preference("dom.webdriver.enabled", False)  # Disable the webdriver flag
-    options.set_preference("useAutomationExtension", False)  # Disable automation extension
+    options.set_preference('general.useragent.override',
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0')
+    options.set_preference('dom.webdriver.enabled', False)  # Disable the webdriver flag
+    options.set_preference('useAutomationExtension', False)  # Disable automation extension
 
     service = Service(f'{os.getcwd()}/Geckodriver')
 
@@ -262,7 +283,7 @@ def main():
     driver.install_addon(f'{os.getcwd()}/ext.xpi', temporary=True)
 
     WebDriverWait(driver, 10).until(
-        lambda d: d.execute_script("return document.readyState") == "complete"
+        lambda d: d.execute_script('return document.readyState') == 'complete'
     )
 
     for url in adv_search_urls:
