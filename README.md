@@ -5,6 +5,8 @@ Watchdxg is a Python-based scraper that monitors and extracts posts from X (form
 The script logs in to an X account, performs advanced searches, and retrieves details such as post content, user handles, timestamps, and interaction statistics.
 The end goal here is to get alerts when a post matching a particular X search is found.
 
+## ⚠️ ***DISCLAIMER: X's TOU/TOS prohibit automated tools on their platform. USE AT YOUR OWN RISK*** ⚠️
+
 ## 👀 Features
 - Automates login to X using Selenium
 - Uses BeautifulSoup to parse and extract post details
