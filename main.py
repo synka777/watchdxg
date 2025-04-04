@@ -20,6 +20,31 @@ env = Env()
 env.read_env()
 
 
+def block_user():
+    pass
+
+
+def get_followers(driver):
+    own_account = env.str('USERNAME')
+    followers_url = f'https://x.com/{own_account}/followers'
+
+    driver.get(followers_url)
+    # See if there's a way to wait for driver.get() to finish before we keep going on
+    sleep(random.uniform(3, 6))
+
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    print(soup)
+    followers_section = soup.select_one('section[id*="accessible-list-"]')
+    followers_wrapper = followers_section.findChild().findNextSibling()
+    followers = followers_wrapper.findChild()
+    handles: list[str] = []
+    # for follower in followers.findAll('div')[:-2]:
+    for follower in followers.findAll('a', {'role':'link'}):
+        # Get each follower's username here
+        print('FOLLOWER:', follower['href'][1:])
+        handles.append(follower['href'][1:])
+
+
 def is_rock_bottom(driver):
     return driver.execute_script("""
             var scrollable = document.documentElement || document.body;
@@ -47,7 +72,6 @@ def get_posts(driver, url):
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
     driver.get(url)
-
     sleep(random.uniform(1, 3))
     batch = []
     pos_history = [0]
