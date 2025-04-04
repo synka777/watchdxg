@@ -22,18 +22,6 @@ import random
 env = Env()
 env.read_env()
 
-
-# def get_product_links(a_tags):
-#     links = []
-#     for a_tag in a_tags:
-#         link = a_tag['href']
-#         prefix = "https://www.sephora.com"
-#         if prefix not in link:
-#             link = f"{prefix}{link}"
-#         links.append(link)
-#     return links
-
-
 # def in_history(url, check_mode=False):
 #     # Checks if the link has already been processed, if so return True
 #     with open('./history.log', 'a+', newline='') as file:
@@ -62,6 +50,32 @@ env.read_env()
 #         # Adds the URL corresponding to the processed product in the history
 #         in_history(url)
 
+
+def block_user():
+    pass
+
+
+def get_followers(driver):
+    own_account = env.str('USERNAME')
+    followers_url = f'https://x.com/{own_account}/followers'
+
+    driver.get(followers_url)
+    # See if there's a way to wait for driver.get() to finish before we keep going on
+    sleep(random.uniform(3, 6))
+
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    print(soup)
+    followers_section = soup.select_one('section[id*="accessible-list-"]')
+    followers_wrapper = followers_section.findChild().findNextSibling()
+    followers = followers_wrapper.findChild()
+    handles: list[str] = []
+    # for follower in followers.findAll('div')[:-2]:
+    for follower in followers.findAll('a', {'role':'link'}):
+        # Get each follower's username here
+        print('FOLLOWER:', follower['href'][1:])
+        handles.append(follower['href'][1:])
+
+
 def is_rock_bottom(driver):
     return driver.execute_script("""
             var scrollable = document.documentElement || document.body;
@@ -89,7 +103,6 @@ def get_posts(driver, url):
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
     driver.get(url)
-
     sleep(random.uniform(1, 3))
     batch = []
     pos_history = [0]
@@ -236,7 +249,7 @@ def login(driver):
         # TODO: Fix an issue where the username field can't be selected or the username can't be sent
         # resulting to Sorry, we could not find your account
         # Get the username field
-        sleep(random.uniform(1, 3))
+        sleep(random.uniform(3, 6))
         username = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[autocomplete="username"]')))
         wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
 
@@ -285,11 +298,13 @@ def main():
     WebDriverWait(driver, 10).until(
         lambda d: d.execute_script('return document.readyState') == 'complete'
     )
+    if login(driver):
+        get_followers(driver)
+    # for url in adv_search_urls:
+    #     if login(driver):
+    #         print('Successfully logged in!')
+            # get_posts(driver, url)
 
-    for url in adv_search_urls:
-        if login(driver):
-            print('Successfully logged in!')
-            get_posts(driver, url)
     # posts = get_posts(driver, url)
     # print(product.encode('utf-8'))
     # if not in_history(href, True):
