@@ -28,3 +28,5 @@ class Post:
         self.reposts = reposts
         self.likes = likes
         self.views = views
+
+# TODO: Add a class for followers

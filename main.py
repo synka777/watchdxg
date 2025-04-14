@@ -1,66 +1,23 @@
 """Watchdxg
-Copyright (c) 2024 Mathieu BARBE-GAYET
+Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from classes import Post
-from environs import Env
-from bs4 import BeautifulSoup
-from selenium import webdriver
 from selenium.common import StaleElementReferenceException, TimeoutException
-from selenium.webdriver import Keys
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver import Keys
+from bs4 import BeautifulSoup
+from environs import Env
+from classes import Post
 from time import sleep
-import os
 import random
-
+import utils
+from exceptions import NotLoggedInError
 
 env = Env()
 env.read_env()
 
-
-# def get_product_links(a_tags):
-#     links = []
-#     for a_tag in a_tags:
-#         link = a_tag['href']
-#         prefix = "https://www.sephora.com"
-#         if prefix not in link:
-#             link = f"{prefix}{link}"
-#         links.append(link)
-#     return links
-
-
-# def in_history(url, check_mode=False):
-#     # Checks if the link has already been processed, if so return True
-#     with open('./history.log', 'a+', newline='') as file:
-#         # If the URL is in the history file, quit the function
-#         if url in file:
-#             file.close()
-#             return True
-#         # If it's not in the history file and if this function has been called without check mode, add it in the history
-#         if not check_mode:
-#             file.write(f"{url}\n")
-#             file.close()
-#             return True
-#     # Else if the function is called with check_mode True it will return false.
-#     # The goal is to use this function to check if an URL has been already processed without adding it in the meantime
-#     return False
-
-
-# def write_to_csv(url, name, category, price, pros, desc, ingredients, how_to_use, pictures):
-#     with open('./products.csv', 'a+', newline='') as csv_file:
-#         if name in csv_file:
-#             csv_file.close()
-#             return
-#         products_csv = csv.writer(csv_file, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-#         products_csv.writerow([name, category, price, pros, desc, ingredients, how_to_use, pictures])
-#         csv_file.close()
-#         # Adds the URL corresponding to the processed product in the history
-#         in_history(url)
 
 def is_rock_bottom(driver):
     return driver.execute_script("""
@@ -220,83 +177,28 @@ def get_posts(driver, url):
             break
 
 
-def send_password(wait):
-    sleep(random.uniform(1, 3))
-    password_field = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]')))
-    sleep(random.uniform(1, 3))
-    password_field.send_keys(env.str('PASSWORD'))
-    sleep(random.uniform(1, 3))
-    password_field.send_keys(Keys.ENTER)
-
-
-def login(driver):
-    driver.get("https://x.com/i/flow/login")
-    wait = WebDriverWait(driver, 10)
-    try:
-        # TODO: Fix an issue where the username field can't be selected or the username can't be sent
-        # resulting to Sorry, we could not find your account
-        # Get the username field
-        sleep(random.uniform(1, 3))
-        username = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[autocomplete="username"]')))
-        wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
-
-        # Input the username
-        sleep(random.uniform(1, 3))
-        username.send_keys(env.str('USERNAME'))
-        sleep(random.uniform(1, 3))
-        username.send_keys(Keys.ENTER)
-
-        send_password(wait)
-
-    except (StaleElementReferenceException, TimeoutException) as e:
-        # TODO: handle Error window on username data-testid="confirmationSheetDialog"
-        print('Working around suspicious activity detection...')
-        contact_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'r-30o5oe')))
-        contact_field.send_keys(env.str('CONTACT'))
-        sleep(random.uniform(1, 3))
-        contact_field.send_keys(Keys.ENTER)
-
-        send_password(wait)
-
-    sleep(random.uniform(1, 3))
-    return True
-
-
 def main():
-    adv_search_urls = [
-        # "https://x.com/search?q=\"list\" (from:upbitglobal)&f=live"
-        # 'https://x.com/search?q=%5C%22list%5C%22%20(from%3Abinance)&src=typed_query&f=live'
-        # 'https://x.com/search?f=live&q=(from%3Abinance)%20filter%3Areplies'
-        'https://x.com/CopperheadSec'
-    ]
 
-    options = Options()
-    options.headless = False
-    options.set_preference('general.useragent.override',
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0')
-    options.set_preference('dom.webdriver.enabled', False)  # Disable the webdriver flag
-    options.set_preference('useAutomationExtension', False)  # Disable automation extension
+    driver = utils.get_driver()
 
-    service = Service(f'{os.getcwd()}/Geckodriver')
+    # Navigate to the X page or any URL
+    driver.get('https://x.com/')
+    sleep(random.uniform(3, 5))
 
-    driver = webdriver.Firefox(service=service, options=options)
-    driver.install_addon(f'{os.getcwd()}/ext.xpi', temporary=True)
+    # Get the current URL after the page loads
+    current_url = driver.current_url
 
-    WebDriverWait(driver, 10).until(
-        lambda d: d.execute_script('return document.readyState') == 'complete'
-    )
-
-    for url in adv_search_urls:
-        if login(driver):
-            print('Successfully logged in!')
-            get_posts(driver, url)
-    # posts = get_posts(driver, url)
-    # print(product.encode('utf-8'))
-    # if not in_history(href, True):
-    #     get_product_details(driver, href)
-    # else:
-    #     print("Skip: ", href)
-    # driver.close()
+    # Check if we need to log in
+    try:
+        if utils.logged_in(current_url):
+            print('Ready to rock')
+            # Wrap the main logic here
+        else:
+            utils.login()
+            if not utils.logged_in(current_url):
+                raise NotLoggedInError('Login attempt failed')
+    except NotLoggedInError as e:
+        print('Error: Unable to login:', e)
 
 
 if __name__ == '__main__':
