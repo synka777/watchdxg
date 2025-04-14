@@ -179,26 +179,25 @@ def get_posts(driver, url):
 
 def main():
 
-    driver = utils.get_driver()
+    with utils.get_driver() as driver:
+        # Navigate to the X page or any URL
+        driver.get('https://x.com/')
+        sleep(random.uniform(3, 5))
 
-    # Navigate to the X page or any URL
-    driver.get('https://x.com/')
-    sleep(random.uniform(3, 5))
+        # Get the current URL after the page loads
+        current_url = driver.current_url
 
-    # Get the current URL after the page loads
-    current_url = driver.current_url
-
-    # Check if we need to log in
-    try:
-        if utils.logged_in(current_url):
-            print('Ready to rock')
-            # Wrap the main logic here
-        else:
-            utils.login()
-            if not utils.logged_in(current_url):
-                raise NotLoggedInError('Login attempt failed')
-    except NotLoggedInError as e:
-        print('Error: Unable to login:', e)
+        # Check if we need to log in
+        try:
+            if utils.logged_in(current_url):
+                print('Ready to rock')
+                # Wrap the main logic here
+            else:
+                utils.login()
+                if not utils.logged_in(current_url):
+                    raise NotLoggedInError('Login attempt failed')
+        except NotLoggedInError as e:
+            print('Error: Unable to login:', e)
 
 
 if __name__ == '__main__':

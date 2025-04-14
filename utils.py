@@ -5,6 +5,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from contextlib import contextmanager
 from selenium.webdriver import Keys
 from selenium import webdriver
 from environs import Env
@@ -16,6 +17,7 @@ env = Env()
 env.read_env()
 
 
+@contextmanager
 def get_driver():
     options = Options()
     options.add_argument(f"-profile")
@@ -35,7 +37,10 @@ def get_driver():
         lambda d: d.execute_script('return document.readyState') == 'complete'
     )
 
-    return driver
+    try:
+        yield driver # <= passes the driver to the with-block
+    finally:
+        driver.quit() # <= runs when the with-block finishes (even on error)
 
 
 def login(driver):
