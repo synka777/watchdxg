@@ -8,9 +8,11 @@ from selenium.webdriver.common.by import By
 from contextlib import contextmanager
 from selenium.webdriver import Keys
 from selenium import webdriver
+from functools import wraps
 from environs import Env
 from time import sleep
 import random
+import time
 import os
 
 env = Env()
@@ -38,9 +40,24 @@ def get_driver():
     )
 
     try:
-        yield driver # <= passes the driver to the with-block
+        yield driver # <= Passes the driver to the with-block
     finally:
-        driver.quit() # <= runs when the with-block finishes (even on error)
+        driver.quit() # <= Runs when the with-block finishes (even on error)
+
+
+# Decorator function
+def delay(min_sec=4, max_sec=6):
+    def decorator(func): # Receives the function we’ll be decorating (func) as an arg
+        @wraps(func) # Preserves the original function’s name, docstring, etc
+        def wrapper(*args, **kwargs): # Defines the function that'll wrap the decorated func
+            sleep_time = random.uniform(min_sec, max_sec)
+            time.sleep(sleep_time)
+            print(f'Sleeping for {sleep_time:.2f}s...')
+
+            result = func(*args, **kwargs) # Decorated func is executed here
+            return result # Returns the result of the decorated func
+        return wrapper
+    return decorator
 
 
 def login(driver):

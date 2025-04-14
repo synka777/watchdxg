@@ -6,14 +6,15 @@ Released under the MIT license
 from selenium.common import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from exceptions import NotLoggedInError
 from selenium.webdriver import Keys
 from bs4 import BeautifulSoup
 from environs import Env
 from classes import Post
+from utils import delay
 from time import sleep
 import random
 import utils
-from exceptions import NotLoggedInError
 
 env = Env()
 env.read_env()
