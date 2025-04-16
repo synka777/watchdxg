@@ -23,26 +23,23 @@ env.read_env()
 def block_user():
     pass
 
-
-def get_followers(driver):
-    own_account = env.str('USERNAME')
-    followers_url = f'https://x.com/{own_account}/followers'
-
-    driver.get(followers_url)
-    # See if there's a way to wait for driver.get() to finish before we keep going on
-    sleep(random.uniform(3, 6))
+@delay()
+def get_user_handles(driver):
+    user_handles: list[str] = []
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
-    print(soup)
-    followers_section = soup.select_one('section[id*="accessible-list-"]')
-    followers_wrapper = followers_section.findChild().findNextSibling()
-    followers = followers_wrapper.findChild()
-    handles: list[str] = []
-    # for follower in followers.findAll('div')[:-2]:
-    for follower in followers.findAll('a', {'role':'link'}):
-        # Get each follower's username here
-        print('FOLLOWER:', follower['href'][1:])
-        handles.append(follower['href'][1:])
+    followers_section = soup.find('section', attrs={'role': 'region'})
+
+    followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
+
+    # Get each follower's handle here
+    for follower in followers:
+        a_elem = follower.find('a', {'role':'link', 'aria-hidden': 'true'})
+        if a_elem.has_attr('href'):
+            print('Follower:', a_elem['href'][1:])
+            user_handles.append(a_elem['href'][1:])
+
+    return user_handles
 
 
 def is_rock_bottom(driver):
@@ -212,11 +209,27 @@ def main():
         # Get the current URL after the page loads
         current_url = driver.current_url
 
-        # Check if we need to log in
-        try:
+        # Initialize main variables
+        user_handles: list[str] = []
+
+        try: # Check if we need to log in
             if utils.logged_in(current_url):
                 print('Ready to rock')
+                ###########################
                 # Wrap the main logic here
+
+                # Load the followers page with the driver
+                own_account = env.str('USERNAME')
+                followers_url = f'https://x.com/{own_account}/followers'
+
+                # Then process the soup to get the user handle of each follower
+                driver.get(followers_url)
+                user_handles = get_user_handles(driver)
+
+                for user in user_handles:
+                    # Open a new tab and get user data
+                    pass
+
             else:
                 utils.login()
                 if not utils.logged_in(current_url):
