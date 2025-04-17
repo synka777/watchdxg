@@ -3,18 +3,23 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
+import json
 from selenium.common import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
+from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from exceptions import NotLoggedInError
 from selenium.webdriver import Keys
 from bs4 import BeautifulSoup
+from datetime import datetime
 from environs import Env
 from classes import Post
-from utils import delay
+from infra import delay
 from time import sleep
 import random
+import infra
 import utils
+import re
 
 env = Env()
 env.read_env()
@@ -22,6 +27,52 @@ env.read_env()
 
 def block_user():
     pass
+
+
+@delay()
+def get_user_data(handle):
+    with infra.get_driver(use_cookies=True) as driver:
+        driver.get(f'https://x.com/{handle}')
+        sleep(random.uniform(4, 6))
+
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
+        user_name_elem =  next(
+            (div for div in user_name_wrapper.find_all("div") if div.get_text(strip=True)),
+            None
+        )
+        bio_elem = soup.find(attrs={'data-testid': 'UserDescription'}).select('span')
+
+        date_pattern = re.compile(r'\d{4}')
+        joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
+        date_str_list = joined_elem.text.strip().split(' ').reverse()[:2]
+        date_str = ' '.join(date_str_list)
+        date_joined = datetime.strptime(date_str, '%B %Y')
+
+        number_pattern = re.compile(r'\d( (M|k))?')
+        following_elem = soup.find('a', attrs={'href': f'/{handle}/following'}).find('span', string=number_pattern)
+        following_int = utils.str_to_int(following_elem.text)
+        followers_elem = soup.find('a', attrs={'href': f'/{handle}/verified_followers'}).find('span', string=number_pattern)
+        followers_int = utils.str_to_int(followers_elem.text)
+
+        profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
+        if profile_header:
+            user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
+            url_pattern = re.compile(r'\w+.\w+\/\w+')
+            user_url_display = user_url.find(string=url_pattern)
+
+
+        print('Username:', user_name_elem.text.strip())
+        print('Bio:', bio_elem.text.strip())
+        print('Joined:', date_joined)
+        print('Followers:', followers_int)
+        print('Following:', following_int)
+        if profile_header:
+            print('User URL:', user_url['href'], user_url_display.text)
+
+        # TODO: Create a user model and save+return user data into a user instance
+
+        return
 
 @delay()
 def get_user_handles(driver):
@@ -201,7 +252,7 @@ def get_posts(driver, url):
 
 def main():
 
-    with utils.get_driver() as driver:
+    with infra.get_driver() as driver:
         # Navigate to the X page or any URL
         driver.get('https://x.com/')
         sleep(random.uniform(3, 5))
@@ -213,7 +264,7 @@ def main():
         user_handles: list[str] = []
 
         try: # Check if we need to log in
-            if utils.logged_in(current_url):
+            if infra.logged_in(current_url):
                 print('Ready to rock')
                 ###########################
                 # Wrap the main logic here
@@ -221,18 +272,26 @@ def main():
                 # Load the followers page with the driver
                 own_account = env.str('USERNAME')
                 followers_url = f'https://x.com/{own_account}/followers'
+                cookies = driver.get_cookies()
+
+                # Try...except
+                with open('cookies.json', 'w') as f:
+                    json.dump(cookies, f, indent=2)
 
                 # Then process the soup to get the user handle of each follower
                 driver.get(followers_url)
-                user_handles = get_user_handles(driver)
+                # user_handles = get_user_handles(driver)
+                user_handles = [get_user_handles(driver)[0]]
 
-                for user in user_handles:
-                    # Open a new tab and get user data
-                    pass
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    followers = executor.map(get_user_data, user_handles)
+
+                print(*followers)
+                # Analyze each user's data to determine if it's a fake account or not
 
             else:
-                utils.login()
-                if not utils.logged_in(current_url):
+                infra.login()
+                if not infra.logged_in(current_url):
                     raise NotLoggedInError('Login attempt failed')
         except NotLoggedInError as e:
             print('Error: Unable to login:', e)
