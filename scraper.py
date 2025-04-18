@@ -3,18 +3,12 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-import json
-from selenium.common import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.support import expected_conditions as EC
+from infra import ensure_logged_in, BrowserSingleton
 from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.common.by import By
-from exceptions import NotLoggedInError
-from selenium.webdriver import Keys
 from bs4 import BeautifulSoup
 from datetime import datetime
 from environs import Env
 from classes import Post
-from infra import delay
 from time import sleep
 import random
 import infra
@@ -29,11 +23,16 @@ def block_user():
     pass
 
 
-@delay()
-def get_user_data(handle):
+@ensure_logged_in
+def get_user_data(handle, browser): # Here we pass a new browser because we
     with infra.get_driver(use_cookies=True) as driver:
-        driver.get(f'https://x.com/{handle}')
-        sleep(random.uniform(4, 6))
+        # Using one context per get_usr_data() call is lighter
+        # than instanciating one browser per call instead
+        context = browser.new_context()
+        page = context.new_page()
+        url = f'https://x.com/{handle}'
+        page.goto(url)
+        BrowserSingleton().add_url(url)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
@@ -72,15 +71,18 @@ def get_user_data(handle):
 
         # TODO: Create a user model and save+return user data into a user instance
 
+        # Don't forget to close the current context or it could cause issues down the line
+        context.close()
+        BrowserSingleton.pop_url(url)
+
         return
 
-@delay()
-def get_user_handles(driver):
+
+@ensure_logged_in
+def get_user_handles(page):
     user_handles: list[str] = []
-
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    soup = BeautifulSoup(page.content(), 'html.parser')
     followers_section = soup.find('section', attrs={'role': 'region'})
-
     followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
 
     # Get each follower's handle here
@@ -116,7 +118,8 @@ def get_stats(stats_grp, stat_pos):
     return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
 
 
-def get_posts(driver, url):
+@ensure_logged_in
+def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwright
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
     driver.get(url)
@@ -147,7 +150,7 @@ def get_posts(driver, url):
                         if reply_container[5].text.startswith('@') and len(in_reply_to) > 0:
                             in_reply_to.append(reply_container[5].text)
 
-            # TODO: Case 2: handle posts that are directly displayed under the original post
+            # TODOold: Case 2: handle posts that are directly displayed under the original post
 
             # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, etc
             posted_by_at_grp = post_element.select('div', {'data-testid': 'User-Name'})[0]
@@ -199,8 +202,8 @@ def get_posts(driver, url):
             height_pos = scroll(driver)
             if retries > 0:
                 print(f'Trying again... {retries}/{max_retries}')
-                body = driver.find_element(By.TAG_NAME, "body")
-                body.send_keys(Keys.PAGE_DOWN)
+                # body = driver.find_element(By.TAG_NAME, "body")
+                # body.send_keys(Keys.PAGE_DOWN)
 
             # If the new and last height_pos values are the same we might've reached the bottom of the page.
             if height_pos == pos_history[-1]:
@@ -250,51 +253,37 @@ def get_posts(driver, url):
             break
 
 
+#############
+# Main logic
+
 def main():
 
-    with infra.get_driver() as driver:
-        # Navigate to the X page or any URL
-        driver.get('https://x.com/')
-        sleep(random.uniform(3, 5))
+    user_handles = []
+    browser_instance = BrowserSingleton().get_context()
+    page = browser_instance.new_page()
+    # Navigate to the X page or any URL
+    page.goto('https://x.com/', timeout=60000)
 
-        # Get the current URL after the page loads
-        current_url = driver.current_url
+    # Initialize main variables
+    user_handles: list[str] = []
 
-        # Initialize main variables
-        user_handles: list[str] = []
+    # Load the followers page with the pw page
+    own_account = env.str('USERNAME')
+    followers_url = f'https://x.com/{own_account}/followers'
 
-        try: # Check if we need to log in
-            if infra.logged_in(current_url):
-                print('Ready to rock')
-                ###########################
-                # Wrap the main logic here
+    # Then process the soup to get the user handle of each follower
+    page.goto(followers_url)
+    # user_handles = get_user_handles()
+    user_handles = [get_user_handles(page)[0]]
 
-                # Load the followers page with the driver
-                own_account = env.str('USERNAME')
-                followers_url = f'https://x.com/{own_account}/followers'
-                cookies = driver.get_cookies()
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # The lambda function allows us to pass multiple arguments to get_user_data
+        followers = executor.map(lambda handle: get_user_data(handle, browser_instance), user_handles)
 
-                # Try...except
-                with open('cookies.json', 'w') as f:
-                    json.dump(cookies, f, indent=2)
+        print(*followers)
+        # Analyze each user's data to determine if it's a fake account or not
 
-                # Then process the soup to get the user handle of each follower
-                driver.get(followers_url)
-                # user_handles = get_user_handles(driver)
-                user_handles = [get_user_handles(driver)[0]]
-
-                with ThreadPoolExecutor(max_workers=3) as executor:
-                    followers = executor.map(get_user_data, user_handles)
-
-                print(*followers)
-                # Analyze each user's data to determine if it's a fake account or not
-
-            else:
-                infra.login()
-                if not infra.logged_in(current_url):
-                    raise NotLoggedInError('Login attempt failed')
-        except NotLoggedInError as e:
-            print('Error: Unable to login:', e)
+    browser_instance.close_context()
 
 
 if __name__ == '__main__':
