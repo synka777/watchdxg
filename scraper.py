@@ -77,7 +77,7 @@ def get_user_data(handle, context):
 
 @ensure_logged_in
 def get_user_handles():
-    page = BrowserSingleton().get_page()
+    page = BrowserSingleton.get_page()
     # Here we use "first" because multiple selectors that can be returned w/ this selector
     page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
     user_handles: list[str] = []
@@ -256,37 +256,35 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
 #############
 # Main logic
 
+@ensure_logged_in
 def main():
-
-    user_handles = []
-    context = BrowserSingleton().get_context()
-    page = BrowserSingleton().get_page()
-    # Navigate to the X page or any URL
-    page.goto('https://x.com/', timeout=60000)
-
     # Initialize main variables
     user_handles: list[str] = []
-
-    # Load the followers page with the pw page
+    followers = []
     own_account = env.str('USERNAME')
     followers_url = f'https://x.com/{own_account}/followers'
+
+    page = BrowserSingleton.get_page()
 
     # Then process the soup to get the user handle of each follower
     page.goto(followers_url)
     user_handles = get_user_handles()
     # user_handles = [get_user_handles(page)[0]]
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # The lambda function allows us to pass multiple arguments to get_user_data
-        for handle in user_handles:
-            followers = executor.submit(get_user_data, handle, context)
-            # followers = executor.map(lambda handle: get_user_data(handle, context), user_handles)
+    # with ThreadPoolExecutor(max_workers=4) as executor:
+    #     # The lambda function allows us to pass multiple arguments to get_user_data
+    #     for handle in user_handles:
+    #         new_ctx = BrowserSingleton.get_new_context()
+    #         future = executor.submit(get_user_data, handle, new_ctx)
+    #         followers.append(future.result())
 
-        print(*followers)
+    #     print(*followers)
         # Analyze each user's data to determine if it's a fake account or not
 
-    context.close_context()
+    BrowserSingleton.close_main_context()
 
 
 if __name__ == '__main__':
+    BrowserSingleton()
+
     main()
