@@ -24,15 +24,13 @@ def block_user():
 
 
 @ensure_logged_in
-def get_user_data(handle, browser): # Here we pass a new browser because we
+def get_user_data(handle, context):
     with infra.get_driver(use_cookies=True) as driver:
         # Using one context per get_usr_data() call is lighter
         # than instanciating one browser per call instead
-        context = browser.new_context()
         page = context.new_page()
         url = f'https://x.com/{handle}'
         page.goto(url)
-        BrowserSingleton().add_url(url)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
@@ -73,13 +71,15 @@ def get_user_data(handle, browser): # Here we pass a new browser because we
 
         # Don't forget to close the current context or it could cause issues down the line
         context.close()
-        BrowserSingleton.pop_url(url)
 
         return
 
 
 @ensure_logged_in
-def get_user_handles(page):
+def get_user_handles():
+    page = BrowserSingleton().get_page()
+    # Here we use "first" because multiple selectors that can be returned w/ this selector
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
     user_handles: list[str] = []
     soup = BeautifulSoup(page.content(), 'html.parser')
     followers_section = soup.find('section', attrs={'role': 'region'})
@@ -259,8 +259,8 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
 def main():
 
     user_handles = []
-    browser_instance = BrowserSingleton().get_context()
-    page = browser_instance.new_page()
+    context = BrowserSingleton().get_context()
+    page = BrowserSingleton().get_page()
     # Navigate to the X page or any URL
     page.goto('https://x.com/', timeout=60000)
 
@@ -273,17 +273,19 @@ def main():
 
     # Then process the soup to get the user handle of each follower
     page.goto(followers_url)
-    # user_handles = get_user_handles()
-    user_handles = [get_user_handles(page)[0]]
+    user_handles = get_user_handles()
+    # user_handles = [get_user_handles(page)[0]]
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         # The lambda function allows us to pass multiple arguments to get_user_data
-        followers = executor.map(lambda handle: get_user_data(handle, browser_instance), user_handles)
+        for handle in user_handles:
+            followers = executor.submit(get_user_data, handle, context)
+            # followers = executor.map(lambda handle: get_user_data(handle, context), user_handles)
 
         print(*followers)
         # Analyze each user's data to determine if it's a fake account or not
 
-    browser_instance.close_context()
+    context.close_context()
 
 
 if __name__ == '__main__':

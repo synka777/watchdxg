@@ -50,38 +50,31 @@ class BrowserSingleton:
             viewport={'width': 1920, 'height': 6000},  # Large viewport to avoid lazy-loaded content issues
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
         )
+        cls._page = cls._context.new_page()
+
+    def get_browser(cls):
+        return cls._instance
 
     def get_context(self):
         return self._context  # Return the context, not the browser
+
+    def get_page(cls):
+        return cls._page
+
+    def logged_in(cls):
+        try:
+            cls._page.locator('header[role="banner"]').wait_for(timeout=10000)
+            print("Navigation bar is present — you're logged in!")
+            return True
+        except TimeoutError:
+            print("Navigation bar not found — probably still on login page.")
+            return False
 
     def close_context(self):
         """Closes the browser context and resets the singleton instance."""
         if self._context:
             self._context.close()
             self._instance = None  # Allow re-instantiating later if needed
-
-    def get_url(self):
-        """
-        Returns the most recently added URL from the processing queue.
-        Returns None if the queue is empty.
-        """
-        return self._processing[-1] if self._processing else None
-
-    def add_url(self, url):
-        """
-        Adds a URL to the processing queue.
-        Useful if you're tracking which URLs are currently being handled.
-        """
-        self._processing.append(url)
-
-    def pop_url(self, url):
-        """
-        Removes a URL from the processing queue if it exists.
-        Useful when a scraping task has finished.
-        """
-        if url in self._processing:
-            self._processing.remove(url)
-
 
 ##################
 # Decorators zone
@@ -104,15 +97,14 @@ def delay(min_sec=4, max_sec=6):
 def ensure_logged_in(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        current_url = BrowserSingleton().get_url() # Get current url from singleton class
         try:
-            if logged_in(current_url):
+            if BrowserSingleton().logged_in():
                 result = func(*args, **kwargs) # Decorated func is executed here
                 return result # Returns the result of the decorated func
             else:
                 print('Not logged in! Attempting automatic login...')
-                login()
-                if not logged_in(current_url):
+                login(BrowserSingleton().get_page())
+                if not BrowserSingleton().logged_in():
                     raise NotLoggedInError('Login attempt failed')
         except NotLoggedInError as e:
             print('Error: Unable to login:', e)
@@ -154,14 +146,5 @@ def send_password(page):
     sleep(random.uniform(0.5, 1.2))
     password_input.fill(env.str('PASSWORD'))
     sleep(random.uniform(0.5, 1.2))
+
     password_input.press('Enter')
-
-
-def logged_in(current_url):
-    if 'redirect_after_login' in current_url \
-    or 'home' not in current_url:
-        print("Session expired or you're logged out. Attempting automatic login...")
-        return False
-    else:
-        print(f'On the correct page: {current_url}')
-        return True

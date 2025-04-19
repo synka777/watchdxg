@@ -6,4 +6,4 @@ regex==2023.10.3
 beautifulsoup4==4.12.2
 environs==11.2.1
 python-dotenv==1.1.0
-
+playwright==1.51.0
