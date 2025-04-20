@@ -38,17 +38,31 @@ class AsyncBrowserManager:
     @classmethod
     async def init(cls):
         if cls._browser:
-            return # Enforce singleton logic
-        playwright = await async_playwright().start()
-        # Launch the browser (not persistent)
-        cls._browser = await playwright.firefox.launch_persistent_context(
-                user_data_dir= env.str('FFPROFILEPATH'),
-                headless=False,
+            return  # Singleton pattern - no need to initialize again
+
+        try:
+            playwright = await async_playwright().start()
+
+            # Launch the browser (not persistent)
+            cls._browser = await playwright.firefox.launch_persistent_context(
+                user_data_dir=env.str('FFPROFILEPATH'),
+                headless=True,
                 viewport={'width': 1920, 'height': 6000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
-        cls._page = cls._browser.pages[0] if cls._browser.pages else await cls._browser.new_page()
-        await cls._page.goto('https://x.com/home', wait_until='load')
+
+            cls._page = cls._browser.pages[0] if cls._browser.pages else await cls._browser.new_page()
+
+            # Go to the homepage
+            await cls._page.goto('https://x.com/home', wait_until='domcontentloaded')
+
+            # Wait for an element that confirms the page is loaded (e.g., header or navigation bar)
+            await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
+
+            print("BrowserManager ready")
+
+        except Exception as e:
+            print(f"[ERROR] Something went wrong: {e}")
 
     # No need to use async if we just return async class instances
     @classmethod
@@ -66,14 +80,15 @@ class AsyncBrowserManager:
     @classmethod
     async def logged_in(cls):
         try:
+            # print('Are we logged in? Checking...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=15000)  # Increase timeout to 15 seconds
-            print('[INFO] Navigation bar is present — you are logged in!')
+            # print('[INFO] Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
-            print(f'[DEBUG] Current URL: {current_url}')
+            # print(f'[DEBUG] Current URL: {current_url}')
 
             if 'login' in current_url or 'flow' in current_url:
                 print('[DEBUG] Still on login page — probably not logged in.')
@@ -117,10 +132,10 @@ def delay(min_sec=4, max_sec=6):
 def enforce_login(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        print('Checking login status...')  # Debugging line
+        print('Decorator kicking...')  # Debugging line
         try:
             if await AsyncBrowserManager.logged_in():
-                print('Already logged in!')  # Debugging line
+                # print('Already logged in!')  # Debugging line
                 return await func(*args, **kwargs)
             else:
                 print('Not logged in! Attempting automatic login...')
@@ -172,12 +187,12 @@ async def login(page):
 
 
 async def send_password(page):
-    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+    await asyncio.sleep(random.uniform(0.5, 1.2))
     password_input = page.locator('input[name="password"]')
     await password_input.wait_for()
 
-    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+    await asyncio.sleep(random.uniform(0.5, 1.2))
     await password_input.fill(env.str('PASSWORD'))
-    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+    await asyncio.sleep(random.uniform(0.5, 1.2))
 
     await password_input.press('Enter')

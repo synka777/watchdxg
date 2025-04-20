@@ -23,21 +23,22 @@ def block_user():
     pass
 
 
-# Don't use enforce_login here because get_user_data is executed in other threads
-# enforce_login makes sure we're logged in with the main thread => Not compatible
+@enforce_login
 async def get_user_data(handle):
-
     # Using one context per get_usr_data() call is lighter
     # than instanciating one browser per call instead
     try:
         page = await AsyncBrowserManager.get_new_page()
         url = f'https://x.com/{handle}'
         await page.goto(url)
-        html = await page.content()
+        # html = await page.wait_for_selector('div[data-testid="UserName"]').evaluate('element => element.outerHTML')
+        element = await page.wait_for_selector('div[data-testid="primaryColumn"]')
+        html = await element.evaluate('el => el.outerHTML')
         soup = BeautifulSoup(html, 'html.parser')
-        user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
+        user_name_wrapper = soup.find('div', attrs={'data-testid': 'UserName'})
+        print(user_name_wrapper)
         user_name_elem =  next(
-            (div for div in user_name_wrapper.find_all("div") if div.get_text(strip=True)),
+            (div for div in user_name_wrapper.find_all('div') if div.get_text(strip=True)),
             None
         )
         bio_elem = soup.find(attrs={'data-testid': 'UserDescription'}).select('span')
@@ -81,9 +82,10 @@ async def get_user_data(handle):
 async def get_user_handles():
     page = AsyncBrowserManager.get_page()
     # Here we use "first" because multiple selectors that can be returned w/ this selector
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
     user_handles: list[str] = []
-    soup = BeautifulSoup(page.content(), 'html.parser')
+    html = await page.content()
+    soup = BeautifulSoup(html, 'html.parser')
     followers_section = soup.find('section', attrs={'role': 'region'})
     followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
 
@@ -273,11 +275,13 @@ async def main():
     # user_handles = [get_user_handles()[0]]
 
     tasks = [get_user_data(handle) for handle in user_handles]
-    followers = await asyncio.gather(*tasks)
+    followers = await asyncio.gather(*tasks, return_exceptions=True)
 
     await AsyncBrowserManager.close()
 
+async def start():
+    await AsyncBrowserManager.init()
+    await main()
 
 if __name__ == '__main__':
-    asyncio.run(AsyncBrowserManager.init())
-    asyncio.run(main())
+    asyncio.run(start())
