@@ -12,12 +12,13 @@ from classes import Post
 from time import sleep
 import asyncio
 import random
+import locale
 import utils
 import re
 
 env = Env()
 env.read_env()
-
+locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
 
 def block_user():
     pass
@@ -31,21 +32,29 @@ async def get_user_data(handle):
         page = await AsyncBrowserManager.get_new_page()
         url = f'https://x.com/{handle}'
         await page.goto(url)
-        # html = await page.wait_for_selector('div[data-testid="UserName"]').evaluate('element => element.outerHTML')
-        element = await page.wait_for_selector('div[data-testid="primaryColumn"]')
-        html = await element.evaluate('el => el.outerHTML')
+
+        # Wait for one of the last elements of the page to load and THEN get the DOM
+        await page.wait_for_selector('article[data-testid="tweet"]')
+        html = await page.content()
         soup = BeautifulSoup(html, 'html.parser')
+
         user_name_wrapper = soup.find('div', attrs={'data-testid': 'UserName'})
-        print(user_name_wrapper)
-        user_name_elem =  next(
-            (div for div in user_name_wrapper.find_all('div') if div.get_text(strip=True)),
+        user_name_elem = next(
+            (div for div in user_name_wrapper.find_all('div')
+            if div.get_text(strip=True) and not div.find('div')),  # Ensure no nested <div>
             None
         )
-        bio_elem = soup.find(attrs={'data-testid': 'UserDescription'}).select('span')
 
+        bio_elem_wrapper = soup.find(attrs={'data-testid': 'UserDescription'})
+        bio_elem = next(
+            (div for div in bio_elem_wrapper.find_all('span')
+            if div.get_text(strip=True)),
+            None
+        )
         date_pattern = re.compile(r'\d{4}')
         joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
-        date_str_list = joined_elem.text.strip().split(' ').reverse()[:2]
+
+        date_str_list = joined_elem.text.strip().split(' ')[-2:]
         date_str = ' '.join(date_str_list)
         date_joined = datetime.strptime(date_str, '%B %Y')
 
@@ -61,9 +70,8 @@ async def get_user_data(handle):
             url_pattern = re.compile(r'\w+.\w+\/\w+')
             user_url_display = user_url.find(string=url_pattern)
 
-
         print('Username:', user_name_elem.text.strip())
-        print('Bio:', bio_elem.text.strip())
+        print('Bio:', bio_elem.text)
         print('Joined:', date_joined)
         print('Followers:', followers_int)
         print('Following:', following_int)
@@ -279,9 +287,11 @@ async def main():
 
     await AsyncBrowserManager.close()
 
+
 async def start():
     await AsyncBrowserManager.init()
     await main()
+
 
 if __name__ == '__main__':
     asyncio.run(start())
