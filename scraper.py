@@ -3,15 +3,15 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from infra import enforce_login, BrowserSingleton
+from infra import enforce_login, AsyncBrowserManager
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from datetime import datetime
 from environs import Env
 from classes import Post
 from time import sleep
+import asyncio
 import random
-import infra
 import utils
 import re
 
@@ -25,15 +25,16 @@ def block_user():
 
 # Don't use enforce_login here because get_user_data is executed in other threads
 # enforce_login makes sure we're logged in with the main thread => Not compatible
-def get_user_data(handle):
+async def get_user_data(handle):
+
     # Using one context per get_usr_data() call is lighter
     # than instanciating one browser per call instead
     try:
-        page = BrowserSingleton.get_page()
+        page = await AsyncBrowserManager.get_new_page()
         url = f'https://x.com/{handle}'
-        page.goto(url)
-
-        soup = BeautifulSoup(page.content(), 'html.parser')
+        await page.goto(url)
+        html = await page.content()
+        soup = BeautifulSoup(html, 'html.parser')
         user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
         user_name_elem =  next(
             (div for div in user_name_wrapper.find_all("div") if div.get_text(strip=True)),
@@ -71,14 +72,14 @@ def get_user_data(handle):
         # TODO: Create a user model and save+return user data into a user instance
     finally:
         # Don't forget to close the current context or it could cause issues down the line
-        page.close()
+        await page.close()
 
     return
 
 
 @enforce_login
-def get_user_handles():
-    page = BrowserSingleton.get_page()
+async def get_user_handles():
+    page = AsyncBrowserManager.get_page()
     # Here we use "first" because multiple selectors that can be returned w/ this selector
     page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
     user_handles: list[str] = []
@@ -258,33 +259,25 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
 # Main logic
 
 @enforce_login
-def main():
+async def main():
     # Initialize main variables
     user_handles: list[str] = []
-    followers = []
+
     own_account = env.str('USERNAME')
     followers_url = f'https://x.com/{own_account}/followers'
-    browser = BrowserSingleton()
-    page = browser.get_page()
+    page = AsyncBrowserManager.get_page()
 
     # Then process the soup to get the user handle of each follower
-    page.goto(followers_url)
-    user_handles = get_user_handles()
+    await page.goto(followers_url)
+    user_handles = await get_user_handles()
     # user_handles = [get_user_handles()[0]]
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # The lambda function allows us to pass multiple arguments to get_user_data
-        for handle in user_handles:
-            future = executor.map(get_user_data, user_handles)
-            # followers.append(future.result())
+    tasks = [get_user_data(handle) for handle in user_handles]
+    followers = await asyncio.gather(*tasks)
 
-        # print(*followers)
-        # Analyze each user's data to determine if it's a fake account or not
-
-    BrowserSingleton.close()
+    await AsyncBrowserManager.close()
 
 
 if __name__ == '__main__':
-    BrowserSingleton()
-
-    main()
+    asyncio.run(AsyncBrowserManager.init())
+    asyncio.run(main())

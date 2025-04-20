@@ -1,9 +1,9 @@
-from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from exceptions import NotLoggedInError
 from functools import wraps
 from environs import Env
 from time import sleep
+import asyncio
 import random
 
 env = Env()
@@ -12,7 +12,7 @@ env.read_env()
 #################
 # App state mgmt
 
-class BrowserSingleton:
+class AsyncBrowserManager:
     # Class-level variables to store the singleton instance, browser context, and processing state
     _instance = None
     _browser = None
@@ -27,29 +27,30 @@ class BrowserSingleton:
         """
 
         # If an instance doesn't exist yet, create one and initialize the browser context
-        # This is the part that actually enforce Singleton pattern behavior
+        # This is the part that actually enforces Singleton pattern behavior
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._initialize_browser()
         return cls._instance
 
     # @classmethod allows us to access the class itself (cls) instead of an instance (self).
     # It’s used for operations that should apply to the class level (like checking or setting the _instance variable).
     # @staticmethod could also be used here to initialize resources without needing to access any instance or class attributes directly.
     @classmethod
-    def _initialize_browser(cls):
-        playwright = sync_playwright().start()
-        profile_path = Path("playwright_profile")  # Will be created if it doesn't exist
+    async def init(cls):
+        if cls._browser:
+            return # Enforce singleton logic
+        playwright = await async_playwright().start()
         # Launch the browser (not persistent)
-        cls._browser = playwright.firefox.launch_persistent_context(
+        cls._browser = await playwright.firefox.launch_persistent_context(
                 user_data_dir= env.str('FFPROFILEPATH'),
                 headless=False,
                 viewport={'width': 1920, 'height': 6000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
-        cls._page = cls._browser.pages[0] if cls._browser.pages else cls._browser.new_page()
-        cls._page.goto('https://x.com/home', wait_until='load')
+        cls._page = cls._browser.pages[0] if cls._browser.pages else await cls._browser.new_page()
+        await cls._page.goto('https://x.com/home', wait_until='load')
 
+    # No need to use async if we just return async class instances
     @classmethod
     def get_browser(cls):
         return cls._browser
@@ -59,11 +60,15 @@ class BrowserSingleton:
         return cls._page
 
     @classmethod
-    def logged_in(cls):
+    async def get_new_page(cls):
+        return await cls._browser.new_page()
+
+    @classmethod
+    async def logged_in(cls):
         try:
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
-            cls._page.wait_for_selector('header[role="banner"]', timeout=15000)  # Increase timeout to 15 seconds
+            await cls._page.wait_for_selector('header[role="banner"]', timeout=15000)  # Increase timeout to 15 seconds
             print('[INFO] Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
@@ -85,9 +90,9 @@ class BrowserSingleton:
             return False
 
     @classmethod
-    def close(cls):
+    async def close(cls):
         if cls._browser:
-            cls._browser.close()
+            await cls._browser.close()
             cls._instance = None
 
 
@@ -109,21 +114,21 @@ def delay(min_sec=4, max_sec=6):
     return decorator
 
 # Decorator function: when you don't need to pass custom parameters
-def ensure_logged_in(func):
+def enforce_login(func):
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs):
         print('Checking login status...')  # Debugging line
         try:
-            if BrowserSingleton.logged_in():
+            if await AsyncBrowserManager.logged_in():
                 print('Already logged in!')  # Debugging line
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
             else:
                 print('Not logged in! Attempting automatic login...')
-                login(BrowserSingleton.get_page())
-                if not BrowserSingleton.logged_in():
+                await login(AsyncBrowserManager.get_page())
+                if not await AsyncBrowserManager.logged_in():
                     raise NotLoggedInError('Login attempt failed')
                 print('Login successful!')  # Debugging line
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
         except NotLoggedInError as e:
             print('Error: Unable to login:', e)
             return  # Optionally return an error message or handle the failure
@@ -133,38 +138,31 @@ def ensure_logged_in(func):
     return wrapper
 
 
-
 ####################
 # Regular functions
 
-
-def login(page):
-    # page.goto('https://x.com/i/flow/login')
-
+async def login(page):
     try: # These waits are just here for mimicing human behavior
-        sleep(random.uniform(0.5, 1.2))
-        # Wait for the username field
+        await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
         username_input = page.locator('input[autocomplete="username"]')
-        username_input.wait_for()
+        await username_input.wait_for()
 
-        sleep(random.uniform(0.5, 1.2))
-        username_input.fill(env.str('USERNAME'))
-        sleep(random.uniform(0.5, 1.2))
-        username_input.press('Enter')
+        await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+        await username_input.fill(env.str('USERNAME'))
+        await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+        await username_input.press('Enter')
 
         # Check if the contact input is present by querying its count
         contact_input = page.locator('input[data-testid="ocfEnterTextTextInput"]')
-        if contact_input.count() > 0:
+        if await contact_input.count() > 0:
             # If the contact input exists, fill it and press enter
-            contact_input.fill(env.str('CONTACTINFO'))
-            contact_input.press('Enter')
+            await contact_input.fill(env.str('CONTACTINFO'))
+            await contact_input.press('Enter')
             print('[INFO] Contact info entered.')
         else:
             print('[INFO] Contact info step skipped (input not found).')
 
-        send_password(page)
-        BrowserSingleton.save_auth_state()
-        print('[INFO] Auth state saved to auth_state.json')
+        await send_password(page)
 
     except Exception as e:
         print(f'[ERROR] Login failed: {e}')
@@ -173,13 +171,13 @@ def login(page):
     return True
 
 
-def send_password(page):
-    sleep(random.uniform(0.5, 1.2))
+async def send_password(page):
+    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
     password_input = page.locator('input[name="password"]')
-    password_input.wait_for()
+    await password_input.wait_for()
 
-    sleep(random.uniform(0.5, 1.2))
-    password_input.fill(env.str('PASSWORD'))
-    sleep(random.uniform(0.5, 1.2))
+    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+    await password_input.fill(env.str('PASSWORD'))
+    await asyncio.sleep(random.uniform(0.5, 1.2))        # Wait for the username field
 
-    password_input.press('Enter')
+    await password_input.press('Enter')
