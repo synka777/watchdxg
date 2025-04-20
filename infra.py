@@ -1,11 +1,10 @@
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 from exceptions import NotLoggedInError
 from functools import wraps
 from environs import Env
 from time import sleep
 import random
-import json
-import os
 
 env = Env()
 env.read_env()
@@ -40,58 +39,24 @@ class BrowserSingleton:
     @classmethod
     def _initialize_browser(cls):
         playwright = sync_playwright().start()
-
+        profile_path = Path("playwright_profile")  # Will be created if it doesn't exist
         # Launch the browser (not persistent)
-        cls._browser = playwright.firefox.launch(headless=False)
-        if os.path.exists('auth_state.json'):
-            cls._context = cls._browser.new_context(
-                # viewport={'width': 1920, 'height': 6000},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0',
-                storage_state='auth_state.json'
+        cls._browser = playwright.firefox.launch_persistent_context(
+                user_data_dir= env.str('FFPROFILEPATH'),
+                headless=False,
+                viewport={'width': 1920, 'height': 6000},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
-            print('✅ Cookies loaded from auth_state.json')
-        else:
-            cls._context = cls._browser.new_context(
-                # viewport={'width': 1920, 'height': 6000},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0',
-            )
-        cls._page = cls._context.new_page()
-        # cls.load_cookies()
+        cls._page = cls._browser.pages[0] if cls._browser.pages else cls._browser.new_page()
         cls._page.goto('https://x.com/home', wait_until='load')
 
     @classmethod
-    def save_auth_state(cls):
-        if cls._context:
-            cls._context.storage_state(path='auth_state.json')
-
-    @classmethod
-    def get_main_context(cls):
-        if cls._context:
-            return cls._context
-
-    @classmethod
-    def get_new_context(cls):
-        return cls._browser.new_context(
-                viewport={'width': 1920, 'height': 6000},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0',
-                storage_state='auth_state.json'
-            )
+    def get_browser(cls):
+        return cls._browser
 
     @classmethod
     def get_page(cls):
         return cls._page
-
-    # @classmethod
-    # def load_cookies(cls):
-    #     try:
-    #         with open('auth_state.json', 'r') as f:
-    #             cookies = json.load(f).get('cookies', [])
-    #             cls._page.context.add_cookies(cookies)
-    #             # Print cookies for verification
-    #             current_cookies = cls._page.context.cookies()
-    #             print(f"✅ Current cookies: {current_cookies}")
-    #     except Exception as e:
-    #         print(f"Failed to load cookies: {e}")
 
     @classmethod
     def logged_in(cls):
@@ -99,7 +64,7 @@ class BrowserSingleton:
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
             cls._page.wait_for_selector('header[role="banner"]', timeout=15000)  # Increase timeout to 15 seconds
-            print('✅ Navigation bar is present — you are logged in!')
+            print('[INFO] Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
@@ -120,11 +85,11 @@ class BrowserSingleton:
             return False
 
     @classmethod
-    def close_main_context(cls):
-        """Closes the browser context and resets the singleton instance."""
-        if cls._context:
-            cls._context.close()
-            cls._instance = None  # Allow re-instantiating later if needed
+    def close(cls):
+        if cls._browser:
+            cls._browser.close()
+            cls._instance = None
+
 
 ##################
 # Decorators zone
@@ -193,13 +158,13 @@ def login(page):
             # If the contact input exists, fill it and press enter
             contact_input.fill(env.str('CONTACTINFO'))
             contact_input.press('Enter')
-            print('✅ Contact info entered.')
+            print('[INFO] Contact info entered.')
         else:
-            print('✅ Contact info step skipped (input not found).')
+            print('[INFO] Contact info step skipped (input not found).')
 
         send_password(page)
         BrowserSingleton.save_auth_state()
-        print('✅ Auth state saved to auth_state.json')
+        print('[INFO] Auth state saved to auth_state.json')
 
     except Exception as e:
         print(f'[ERROR] Login failed: {e}')

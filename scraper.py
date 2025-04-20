@@ -3,7 +3,7 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from infra import ensure_logged_in, BrowserSingleton
+from infra import enforce_login, BrowserSingleton
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -23,16 +23,17 @@ def block_user():
     pass
 
 
-@ensure_logged_in
-def get_user_data(handle, context):
-    with infra.get_driver(use_cookies=True) as driver:
-        # Using one context per get_usr_data() call is lighter
-        # than instanciating one browser per call instead
-        page = context.new_page()
+# Don't use enforce_login here because get_user_data is executed in other threads
+# enforce_login makes sure we're logged in with the main thread => Not compatible
+def get_user_data(handle):
+    # Using one context per get_usr_data() call is lighter
+    # than instanciating one browser per call instead
+    try:
+        page = BrowserSingleton.get_page()
         url = f'https://x.com/{handle}'
         page.goto(url)
 
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        soup = BeautifulSoup(page.content(), 'html.parser')
         user_name_wrapper = soup.find(attrs={'data-testid': 'UserName'})
         user_name_elem =  next(
             (div for div in user_name_wrapper.find_all("div") if div.get_text(strip=True)),
@@ -68,14 +69,14 @@ def get_user_data(handle, context):
             print('User URL:', user_url['href'], user_url_display.text)
 
         # TODO: Create a user model and save+return user data into a user instance
-
+    finally:
         # Don't forget to close the current context or it could cause issues down the line
-        context.close()
+        page.close()
 
-        return
+    return
 
 
-@ensure_logged_in
+@enforce_login
 def get_user_handles():
     page = BrowserSingleton.get_page()
     # Here we use "first" because multiple selectors that can be returned w/ this selector
@@ -118,7 +119,7 @@ def get_stats(stats_grp, stat_pos):
     return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
 
 
-@ensure_logged_in
+@enforce_login
 def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwright
     # This function will parse the dom and store each info in a map
     # It then will return this map to the main function
@@ -256,32 +257,31 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
 #############
 # Main logic
 
-@ensure_logged_in
+@enforce_login
 def main():
     # Initialize main variables
     user_handles: list[str] = []
     followers = []
     own_account = env.str('USERNAME')
     followers_url = f'https://x.com/{own_account}/followers'
-
-    page = BrowserSingleton.get_page()
+    browser = BrowserSingleton()
+    page = browser.get_page()
 
     # Then process the soup to get the user handle of each follower
     page.goto(followers_url)
     user_handles = get_user_handles()
-    # user_handles = [get_user_handles(page)[0]]
+    # user_handles = [get_user_handles()[0]]
 
-    # with ThreadPoolExecutor(max_workers=4) as executor:
-    #     # The lambda function allows us to pass multiple arguments to get_user_data
-    #     for handle in user_handles:
-    #         new_ctx = BrowserSingleton.get_new_context()
-    #         future = executor.submit(get_user_data, handle, new_ctx)
-    #         followers.append(future.result())
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # The lambda function allows us to pass multiple arguments to get_user_data
+        for handle in user_handles:
+            future = executor.map(get_user_data, user_handles)
+            # followers.append(future.result())
 
-    #     print(*followers)
+        # print(*followers)
         # Analyze each user's data to determine if it's a fake account or not
 
-    BrowserSingleton.close_main_context()
+    BrowserSingleton.close()
 
 
 if __name__ == '__main__':
