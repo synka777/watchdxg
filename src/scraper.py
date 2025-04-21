@@ -3,12 +3,11 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from infra import enforce_login, AsyncBrowserManager
-from concurrent.futures import ThreadPoolExecutor
+from src.infra import enforce_login, AsyncBrowserManager
 from bs4 import BeautifulSoup
 from datetime import datetime
+from src.classes import Post
 from environs import Env
-from classes import Post
 from time import sleep
 import asyncio
 import random
@@ -19,6 +18,7 @@ import re
 env = Env()
 env.read_env()
 locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
+
 
 def block_user():
     pass
@@ -51,9 +51,9 @@ async def get_user_data(handle):
             if div.get_text(strip=True)),
             None
         )
+
         date_pattern = re.compile(r'\d{4}')
         joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
-
         date_str_list = joined_elem.text.strip().split(' ')[-2:]
         date_str = ' '.join(date_str_list)
         date_joined = datetime.strptime(date_str, '%B %Y')
@@ -89,7 +89,7 @@ async def get_user_data(handle):
 @enforce_login
 async def get_user_handles():
     page = AsyncBrowserManager.get_page()
-    # Here we use "first" because multiple selectors that can be returned w/ this selector
+    # Here we use "first" because multiple elements can be returned w/ this selector
     await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
     user_handles: list[str] = []
     html = await page.content()
@@ -288,10 +288,5 @@ async def main():
     await AsyncBrowserManager.close()
 
 
-async def start():
-    await AsyncBrowserManager.init()
-    await main()
-
-
 if __name__ == '__main__':
-    asyncio.run(start())
+    asyncio.run(main())

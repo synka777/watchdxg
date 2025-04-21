@@ -1,5 +1,5 @@
 from playwright.async_api import async_playwright
-from exceptions import NotLoggedInError
+from src.exceptions import NotLoggedInError
 from functools import wraps
 from environs import Env
 from time import sleep
@@ -18,6 +18,7 @@ class AsyncBrowserManager:
     _browser = None
     _context = None
     _page = None
+    _ready = False
 
     def __new__(cls):
         """
@@ -59,10 +60,15 @@ class AsyncBrowserManager:
             # Wait for an element that confirms the page is loaded (e.g., header or navigation bar)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
 
+            cls._init = True
             print("BrowserManager ready")
 
         except Exception as e:
             print(f"[ERROR] Something went wrong: {e}")
+
+    @classmethod
+    def ready(cls):
+        return cls._ready
 
     # No need to use async if we just return async class instances
     @classmethod
@@ -132,7 +138,9 @@ def delay(min_sec=4, max_sec=6):
 def enforce_login(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        print('Decorator kicking...')  # Debugging line
+        print('Decorator kicks in...')  # Debugging line
+        if not AsyncBrowserManager.ready():
+            await AsyncBrowserManager.init()
         try:
             if await AsyncBrowserManager.logged_in():
                 # print('Already logged in!')  # Debugging line
@@ -149,7 +157,7 @@ def enforce_login(func):
             return  # Optionally return an error message or handle the failure
         except Exception as e:
             print(f'Unexpected error in decorator: {e}')
-            return
+            raise # This is key to get the traceback when an exception is caught
     return wrapper
 
 
