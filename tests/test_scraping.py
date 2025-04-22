@@ -5,6 +5,9 @@ from time import sleep
 import random
 
 
+###################
+# Helper functions
+
 def login(page):
     try: # These waits are just here for mimicing human behavior
         env = Env()
@@ -73,6 +76,9 @@ def send_password(page):
     password_input.press('Enter')
 
 
+########################
+# Unit tests: Home page
+
 def test_login(page):
     """Ensure we're logged in before moving on to other tests"""
     # page = AsyncBrowserManager.get_page()
@@ -97,23 +103,16 @@ def test_login(page):
     assert soup.find('article') is not None
 
 
+########################
+# Unit tests: Followers
+
 def test_get_usercell(page):
     """Followers page: Are individual follower main wrapper still reachable"""
 
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-
-    print("[DEBUG] Navigating to followers page...")
-    try:
-        response = page.goto(f'https://x.com/{username}/followers', timeout=3000)
-        print("[DEBUG] Navigation done.")
-        if response:
-            print("[DEBUG] Status code:", response.status)
-        else:
-            print("[DEBUG] No response object returned")
-    except Exception as e:
-        print("[DEBUG] Navigation failed:", e)
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
 
     # Instead of waiting for networkidle, wait for the button itself
     page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
@@ -128,89 +127,154 @@ def test_get_usercell(page):
     assert user_cell is not None, "UserCell button not found"
 
 
+def test_followers_section(page):
+    """Followers page: Is the follower list's main wrapper still reachable"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
 
-# async def test_get_usercell():
-#     """Followers page: Are individual follower main wrapper still reachable"""
-#     page = AsyncBrowserManager.get_page()
-#     env = Env()
-#     env.read_env()
-#     username = env.str("USERNAME")
-#     page.goto(f'https://x.com/{username}/followers')
-#     user_cell_elem = page.NOOOO.wait_for_selector('button[data-testid="UserCell"]')
-#     html = user_cell_elem.content()
-#     print(html)
-#     assert 'UserCell' in html == True
+    # Wait for an element that's one of the last elements to be loaded
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
 
+    # Then get the actual element we're looking for
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
 
-# async def test_followers_section():
-#     """Followers page: Is the follower list's main wrapper still reachable"""
-#     page = AsyncBrowserManager.get_page()
-
-#     # Wait for an element that's one of the last elements to be loaded
-#     page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
-
-#     html_element = page.locator('section[role:"region"]')
-#     html = html_element.content()
-#     assert 'region' in html # TODO: Refine this test
+    followers_section = soup.find('section', attrs={'role': 'region'})
+    assert followers_section is not None
 
 
+def test_get_user_handle(page):
+    """Followers page: Can we still get user handles"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
 
-# async def test_get_user_handle():
-#     """Followers page: Can we still get user handles"""
-#     page = AsyncBrowserManager.get_page()
-#     html_element = page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
 
-#     html = html_element.content()
-#     soup = BeautifulSoup(html, 'html.parser')
-#     soup.find('a', {'role':'link', 'aria-hidden': 'true'})
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
 
-#     handle = None
-#     if html.has_attr('href'):
-#         handle = html['href']
-#     assert handle and type(handle) == 'str'
-
-
-#####################
-# User page scraping
-
-
-# async def test_get_username():
-#     """"""
-
-#     assert ''
+    a = soup.find('a', {'role':'link', 'aria-hidden': 'true'})
+    handle = None
+    if a.has_attr('href'):
+        handle = a['href']
+    assert handle is not None and isinstance(handle, str)
 
 
-# async def test_get_user_bio():
-#     """"""
-
-#     assert ''
+###########################
+# Unit tests: User profile
 
 
-# async def test_get_user_join_date():
-#     """"""
+def test_get_username(page):
+    """User page: Can we get the username"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
 
-#     assert ''
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
 
-
-# async def test_get_following_count():
-#     """"""
-
-#     assert ''
-
-
-# async def test_get_followers_count():
-#     """"""
-
-#     assert ''
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
 
 
-# async def test_get_url():
-#     """"""
-
-#     assert ''
+    assert ''
 
 
-# async def test_get_url_display_text():
-#     """"""
+def test_get_user_bio(page):
+    """User page: Can we get the user bio"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
 
-#     assert ''
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
+
+
+def test_get_user_join_date(page):
+    """User page: Can we get the join date"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
+
+
+def test_get_followers_count(page):
+    """User page: Can we get the followers count"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
+
+
+def test_get_following_count(page):
+    """User page: Can we get the following count"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
+
+
+def test_get_url(page):
+    """User page: Can we get"""
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
+
+
+def test_get_url_display_text(page):
+    """User page: Can we get Th user's """
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    assert ''
