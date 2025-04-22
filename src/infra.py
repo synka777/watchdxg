@@ -42,12 +42,12 @@ class AsyncBrowserManager:
             return  # Singleton pattern - no need to initialize again
 
         try:
-            playwright = await async_playwright().start()
+            cls._playwright = await async_playwright().start()
 
             # Launch the browser (not persistent)
-            cls._browser = await playwright.firefox.launch_persistent_context(
+            cls._browser = await cls._playwright.firefox.launch_persistent_context(
                 user_data_dir=env.str('FFPROFILEPATH'),
-                headless=True,
+                headless=False,
                 viewport={'width': 1920, 'height': 6000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
@@ -60,7 +60,7 @@ class AsyncBrowserManager:
             # Wait for an element that confirms the page is loaded (e.g., header or navigation bar)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
 
-            cls._init = True
+            cls._ready = True
             print("BrowserManager ready")
 
         except Exception as e:
@@ -77,6 +77,8 @@ class AsyncBrowserManager:
 
     @classmethod
     def get_page(cls):
+        if cls._page is None:
+            print("[DEBUG] Page is not initialized.")
         return cls._page
 
     @classmethod
@@ -86,11 +88,11 @@ class AsyncBrowserManager:
     @classmethod
     async def logged_in(cls):
         try:
-            # print('Are we logged in? Checking...')
+            print('[INFO] Checking login state...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
-            await cls._page.wait_for_selector('header[role="banner"]', timeout=15000)  # Increase timeout to 15 seconds
-            # print('[INFO] Navigation bar is present — you are logged in!')
+            await cls._page.wait_for_selector('header[role="banner"]', timeout=1000)
+            print('[INFO] Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
@@ -113,7 +115,7 @@ class AsyncBrowserManager:
     @classmethod
     async def close(cls):
         if cls._browser:
-            await cls._browser.close()
+            await cls._playwright.stop()
             cls._instance = None
 
 
@@ -138,27 +140,37 @@ def delay(min_sec=4, max_sec=6):
 def enforce_login(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        print('Decorator kicks in...')  # Debugging line
+        # print('[DECORATOR] Entered enforce_login wrapper')
+
         if not AsyncBrowserManager.ready():
+            # print('[DECORATOR] Browser not ready, calling init...')
             await AsyncBrowserManager.init()
+            # print('[DECORATOR] Init complete')
+
         try:
+            # print('[DECORATOR] Checking if logged in...')
             if await AsyncBrowserManager.logged_in():
-                # print('Already logged in!')  # Debugging line
+                print('[DECORATOR] Already logged in, calling function')
                 return await func(*args, **kwargs)
             else:
-                print('Not logged in! Attempting automatic login...')
+                print('[DECORATOR] Not logged in, attempting login...')
                 await login(AsyncBrowserManager.get_page())
+                # print('[DECORATOR] Login attempted')
+
                 if not await AsyncBrowserManager.logged_in():
                     raise NotLoggedInError('Login attempt failed')
-                print('Login successful!')  # Debugging line
+
+                # print('[DECORATOR] Login successful, calling function')
                 return await func(*args, **kwargs)
+
         except NotLoggedInError as e:
-            print('Error: Unable to login:', e)
-            return  # Optionally return an error message or handle the failure
+            print('[DECORATOR] Login error:', e)
+            return
         except Exception as e:
-            print(f'Unexpected error in decorator: {e}')
-            raise # This is key to get the traceback when an exception is caught
+            print('[DECORATOR] Unexpected error:', e)
+            raise
     return wrapper
+
 
 
 ####################

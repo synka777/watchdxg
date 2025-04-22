@@ -91,12 +91,12 @@ async def get_user_handles():
     page = AsyncBrowserManager.get_page()
     # Here we use "first" because multiple elements can be returned w/ this selector
     await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
-    user_handles: list[str] = []
     html = await page.content()
     soup = BeautifulSoup(html, 'html.parser')
     followers_section = soup.find('section', attrs={'role': 'region'})
     followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
 
+    user_handles: list[str] = []
     # Get each follower's handle here
     for follower in followers:
         a_elem = follower.find('a', {'role':'link', 'aria-hidden': 'true'})

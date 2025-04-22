@@ -1,80 +1,166 @@
-from src.infra import AsyncBrowserManager, enforce_login
 from bs4 import BeautifulSoup
 from environs import Env
-import asyncio
-import pytest
+from pathlib import Path
+from time import sleep
+import random
 
-@pytest.mark.asyncio
-@enforce_login
-async def test_login():
+
+def login(page):
+    try: # These waits are just here for mimicing human behavior
+        env = Env()
+        env.read_env()
+
+        sleep(random.uniform(0.5, 1.2))
+        # Wait for the username field
+        username_input = page.locator('input[autocomplete="username"]')
+        # print(page.locator('input[autocomplete="username"]').count())  # Check if the element exists
+        username_input.wait_for()
+
+        sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+        username_input.fill(env.str('USERNAME'))
+        sleep(random.uniform(0.5, 1.2))        # Wait for the username field
+        username_input.press('Enter')
+
+        # Check if the contact input is present by querying its count
+        contact_input = page.locator('input[data-testid="ocfEnterTextTextInput"]')
+
+        if contact_input.count() > 0:
+            # If the contact input exists, fill it and press enter
+            contact_input.fill(env.str('CONTACTINFO'))
+            contact_input.press('Enter')
+            print('[INFO] Contact info entered.')
+        else:
+            print('[INFO] Contact info step skipped (input not found).')
+
+        send_password(page)
+
+    except Exception as e:
+        print(f'[ERROR] Login failed: {e}')
+        return False
+
+    # Save the entire session state (cookies + local storage + session storage)
+    profile_dir = Path(__file__).parent / "playwright_profile"
+    profile_dir.mkdir(exist_ok=True)
+
+    # Path to save the storage state
+    storage_file = profile_dir / "storage_state.json"
+
+    # Allows time for localStorage & sessionStorage to be populated before the dump
+    page.wait_for_timeout(6000)
+
+    # Save session state to the storage file
+    page.context.storage_state(path=str(storage_file))
+
+    print(f"Storage state saved to {storage_file}")
+
+    # After login, inspect localStorage and sessionStorage
+    page.evaluate("console.log(localStorage); console.log(sessionStorage);")
+
+    return True
+
+
+def send_password(page):
+    env = Env()
+    env.read_env()
+    sleep(random.uniform(0.5, 1.2))
+    password_input = page.locator('input[name="password"]')
+    password_input.wait_for()
+
+    sleep(random.uniform(0.5, 1.2))
+    password_input.fill(env.str('PASSWORD'))
+    sleep(random.uniform(0.5, 1.2))
+
+    password_input.press('Enter')
+
+
+def test_login(page):
     """Ensure we're logged in before moving on to other tests"""
-    page = AsyncBrowserManager.get_page()
+    # page = AsyncBrowserManager.get_page()
+    page.goto('https://x.com/home', wait_until='networkidle')  # Wait until network activity is idle
+    current_url = page.url
+
+    if not ('login' in current_url or 'flow' in current_url):
+        print('[INFO] Already logged in')
+        return
+
+    user_agent = page.evaluate("() => navigator.userAgent")
+    print(user_agent)
+
+    login(page)
 
     # Wait for the button to be visible
-    await page.wait_for_selector('article[data-testid="tweet"]')
-    html = await page.content()
+    page.wait_for_selector('article[data-testid="tweet"]')
+    html = page.content()
 
     # Parse the HTML with BeautifulSoup and check if 'article' is present
     soup = BeautifulSoup(html, 'html.parser')
     assert soup.find('article') is not None
 
 
-# @pytest.mark.asyncio
-# @enforce_login
+def test_get_usercell(page):
+    """Followers page: Are individual follower main wrapper still reachable"""
+
+    env = Env()
+    env.read_env()
+    username = env.str("USERNAME")
+
+    print("[DEBUG] Navigating to followers page...")
+    try:
+        response = page.goto(f'https://x.com/{username}/followers', timeout=3000)
+        print("[DEBUG] Navigation done.")
+        if response:
+            print("[DEBUG] Status code:", response.status)
+        else:
+            print("[DEBUG] No response object returned")
+    except Exception as e:
+        print("[DEBUG] Navigation failed:", e)
+
+    # Instead of waiting for networkidle, wait for the button itself
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+
+    html = page.content()
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Looking for the button with the specific data-testid attribute
+    user_cell = soup.find(attrs={"data-testid": "UserCell"})
+
+    # Assert that the UserCell button exists in the page content
+    assert user_cell is not None, "UserCell button not found"
+
+
+
 # async def test_get_usercell():
 #     """Followers page: Are individual follower main wrapper still reachable"""
 #     page = AsyncBrowserManager.get_page()
 #     env = Env()
 #     env.read_env()
 #     username = env.str("USERNAME")
-
-#     print(f"[DEBUG] Going to followers page of {username}...")
-#     await page.goto(f'https://x.com/{username}/followers')
-#     await asyncio.sleep(3)  # let dynamic content load
-
-#     print("[DEBUG] Waiting for UserCell...")
-#     user_cell_elem = await page.wait_for_selector('button[data-testid="UserCell"]', timeout=10000)
-
-#     print("[DEBUG] Getting inner HTML...")
-#     html = await user_cell_elem.inner_html()
-
-#     print("[DEBUG] Got HTML:\n", html)
-#     assert 'UserCell' in html
-
-# @pytest.mark.asyncio
-# async def test_get_usercell():
-#     """Followers page: Are individual follower main wrapper still reachable"""
-#     page = AsyncBrowserManager.get_page()
-#     env = Env()
-#     env.read_env()
-#     username = env.str("USERNAME")
-#     await page.goto(f'https://x.com/{username}/followers')
-#     user_cell_elem = await page.NOOOO.wait_for_selector('button[data-testid="UserCell"]')
-#     html = await user_cell_elem.content()
+#     page.goto(f'https://x.com/{username}/followers')
+#     user_cell_elem = page.NOOOO.wait_for_selector('button[data-testid="UserCell"]')
+#     html = user_cell_elem.content()
 #     print(html)
 #     assert 'UserCell' in html == True
 
 
-# @pytest.mark.asyncio
 # async def test_followers_section():
 #     """Followers page: Is the follower list's main wrapper still reachable"""
 #     page = AsyncBrowserManager.get_page()
 
 #     # Wait for an element that's one of the last elements to be loaded
-#     await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+#     page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
 
-#     html_element = await page.locator('section[role:"region"]')
-#     html = await html_element.content()
+#     html_element = page.locator('section[role:"region"]')
+#     html = html_element.content()
 #     assert 'region' in html # TODO: Refine this test
 
 
-# @pytest.mark.asyncio
+
 # async def test_get_user_handle():
 #     """Followers page: Can we still get user handles"""
 #     page = AsyncBrowserManager.get_page()
-#     html_element = await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+#     html_element = page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
 
-#     html = await html_element.content()
+#     html = html_element.content()
 #     soup = BeautifulSoup(html, 'html.parser')
 #     soup.find('a', {'role':'link', 'aria-hidden': 'true'})
 
@@ -87,50 +173,43 @@ async def test_login():
 #####################
 # User page scraping
 
-# @pytest.mark.asyncio
+
 # async def test_get_username():
 #     """"""
 
 #     assert ''
 
 
-# @pytest.mark.asyncio
 # async def test_get_user_bio():
 #     """"""
 
 #     assert ''
 
 
-# @pytest.mark.asyncio
 # async def test_get_user_join_date():
 #     """"""
 
 #     assert ''
 
 
-# @pytest.mark.asyncio
 # async def test_get_following_count():
 #     """"""
 
 #     assert ''
 
 
-
-# @pytest.mark.asyncio
 # async def test_get_followers_count():
 #     """"""
 
 #     assert ''
 
 
-# @pytest.mark.asyncio
 # async def test_get_url():
 #     """"""
 
 #     assert ''
 
 
-# @pytest.mark.asyncio
 # async def test_get_url_display_text():
 #     """"""
 
