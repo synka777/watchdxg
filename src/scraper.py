@@ -3,11 +3,11 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from src.infra import enforce_login, AsyncBrowserManager
-from src.utils import str_to_int
+from infra import enforce_login, AsyncBrowserManager
+from utils import str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
-from src.classes import Post
+from classes import Post
 from environs import Env
 from time import sleep
 import asyncio

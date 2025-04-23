@@ -1,5 +1,5 @@
 from playwright.async_api import async_playwright
-from src.exceptions import NotLoggedInError
+from exceptions import NotLoggedInError
 from functools import wraps
 from environs import Env
 from time import sleep
@@ -47,7 +47,7 @@ class AsyncBrowserManager:
             # Launch the browser (not persistent)
             cls._browser = await cls._playwright.firefox.launch_persistent_context(
                 user_data_dir=env.str('FFPROFILEPATH'),
-                headless=False,
+                headless=True,
                 viewport={'width': 1920, 'height': 6000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
@@ -88,11 +88,11 @@ class AsyncBrowserManager:
     @classmethod
     async def logged_in(cls):
         try:
-            print('[INFO] Checking login state...')
+            #print('[INFO] Checking login state...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=1000)
-            print('[INFO] Navigation bar is present — you are logged in!')
+            #print('[INFO] Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
@@ -150,7 +150,7 @@ def enforce_login(func):
         try:
             # print('[DECORATOR] Checking if logged in...')
             if await AsyncBrowserManager.logged_in():
-                print('[DECORATOR] Already logged in, calling function')
+                # print('[DECORATOR] Already logged in, calling function')
                 return await func(*args, **kwargs)
             else:
                 print('[DECORATOR] Not logged in, attempting login...')
@@ -193,9 +193,10 @@ async def login(page):
             # If the contact input exists, fill it and press enter
             await contact_input.fill(env.str('CONTACTINFO'))
             await contact_input.press('Enter')
-            print('[INFO] Contact info entered.')
+            # #print('[INFO] Contact info entered.')
         else:
-            print('[INFO] Contact info step skipped (input not found).')
+            # #print('[INFO] Contact info step skipped (input not found).')
+            pass
 
         await send_password(page)
 

@@ -85,7 +85,7 @@ def send_password(page):
 def test_login(page):
     """Ensure we're logged in before moving on to other tests"""
     # page = AsyncBrowserManager.get_page()
-    page.goto('https://x.com/home', timeout=10000)
+    page.goto('https://x.com/home', timeout=6000)
     current_url = page.url
 
     if 'login' in current_url or 'flow' in current_url:
@@ -113,10 +113,10 @@ def test_get_usercell(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}/followers', timeout=6000)
 
     # Instead of waiting for networkidle, wait for the button itself
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -133,10 +133,10 @@ def test_followers_section(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}/followers', timeout=6000)
 
     # Wait for an element that's one of the last elements to be loaded
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=6000)
 
     # Then get the actual element we're looking for
     html = page.content()
@@ -151,9 +151,9 @@ def test_get_user_handle(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}/followers', timeout=6000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -173,9 +173,9 @@ def test_get_username(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -196,9 +196,9 @@ def test_get_user_bio(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -219,9 +219,9 @@ def test_get_user_join_date(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -240,9 +240,9 @@ def test_get_followers_count(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -259,9 +259,9 @@ def test_get_following_count(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -278,9 +278,9 @@ def test_get_website(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=6000)
 
-    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=6000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
@@ -288,7 +288,6 @@ def test_get_website(page):
     # profile_header: only available on profiles that include a location and/or a website
     profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
     user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
-    url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
-    redirected_url = user_url.find(string=url_pattern)
+    url = user_url['href'] if user_url.has_attr('href') else None
 
-    assert redirected_url is not None
+    assert url is not None
