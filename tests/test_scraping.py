@@ -1,9 +1,11 @@
+from src.utils import str_to_int
 from bs4 import BeautifulSoup
+from datetime import datetime
 from environs import Env
 from pathlib import Path
 from time import sleep
 import random
-
+import re
 
 ###################
 # Helper functions
@@ -18,7 +20,6 @@ def login(page):
         username_input = page.locator('input[autocomplete="username"]')
         # print(page.locator('input[autocomplete="username"]').count())  # Check if the element exists
         username_input.wait_for()
-
         sleep(random.uniform(0.5, 1.2))        # Wait for the username field
         username_input.fill(env.str('USERNAME'))
         sleep(random.uniform(0.5, 1.2))        # Wait for the username field
@@ -26,6 +27,7 @@ def login(page):
 
         # Check if the contact input is present by querying its count
         contact_input = page.locator('input[data-testid="ocfEnterTextTextInput"]')
+        sleep(random.uniform(4, 6)) # Let some spare time for the contact form to appear
 
         if contact_input.count() > 0:
             # If the contact input exists, fill it and press enter
@@ -65,14 +67,15 @@ def login(page):
 def send_password(page):
     env = Env()
     env.read_env()
+
     sleep(random.uniform(0.5, 1.2))
     password_input = page.locator('input[name="password"]')
     password_input.wait_for()
 
     sleep(random.uniform(0.5, 1.2))
     password_input.fill(env.str('PASSWORD'))
-    sleep(random.uniform(0.5, 1.2))
 
+    sleep(random.uniform(0.5, 1.2))
     password_input.press('Enter')
 
 
@@ -82,17 +85,15 @@ def send_password(page):
 def test_login(page):
     """Ensure we're logged in before moving on to other tests"""
     # page = AsyncBrowserManager.get_page()
-    page.goto('https://x.com/home', wait_until='networkidle')  # Wait until network activity is idle
+    page.goto('https://x.com/home', timeout=10000)
     current_url = page.url
 
-    if not ('login' in current_url or 'flow' in current_url):
-        print('[INFO] Already logged in')
-        return
+    if 'login' in current_url or 'flow' in current_url:
+        print('[INFO] Attempting autologin...')
+        login(page)
 
-    user_agent = page.evaluate("() => navigator.userAgent")
-    print(user_agent)
-
-    login(page)
+    # user_agent = page.evaluate("() => navigator.userAgent")
+    # print(user_agent)
 
     # Wait for the button to be visible
     page.wait_for_selector('article[data-testid="tweet"]')
@@ -167,21 +168,27 @@ def test_get_user_handle(page):
 ###########################
 # Unit tests: User profile
 
-
 def test_get_username(page):
     """User page: Can we get the username"""
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    user_name_wrapper = soup.find('div', attrs={'data-testid': 'UserName'})
+    user_name_elem = next(
+        (div for div in user_name_wrapper.find_all('div')
+        if div.get_text(strip=True) and not div.find('div')),  # Ensure no nested <div>
+        None
+    )
+    username = user_name_elem.text.strip()
 
-    assert ''
+    assert username is not None and isinstance(username, str)
 
 
 def test_get_user_bio(page):
@@ -189,15 +196,22 @@ def test_get_user_bio(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    bio_elem_wrapper = soup.find(attrs={'data-testid': 'UserDescription'})
+    bio_elem = next(
+        (div for div in bio_elem_wrapper.find_all('span')
+        if div.get_text(strip=True)),
+        None
+    )
+    bio = bio_elem.text.strip()
 
-    assert ''
+    assert bio is not None and isinstance(bio, str)
 
 
 def test_get_user_join_date(page):
@@ -205,15 +219,20 @@ def test_get_user_join_date(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    date_pattern = re.compile(r'\d{4}')
+    joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
+    date_str_list = joined_elem.text.strip().split(' ')[-2:]
+    date_str = ' '.join(date_str_list)
+    date_joined = datetime.strptime(date_str, '%B %Y')
 
-    assert ''
+    assert isinstance(date_joined, datetime)
 
 
 def test_get_followers_count(page):
@@ -221,15 +240,18 @@ def test_get_followers_count(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    number_pattern = re.compile(r'\d( (M|k))?')
+    following_elem = soup.find('a', attrs={'href': f'/{username}/following'}).find('span', string=number_pattern)
+    following_int = str_to_int(following_elem.text)
 
-    assert ''
+    assert isinstance(following_int, int)
 
 
 def test_get_following_count(page):
@@ -237,44 +259,36 @@ def test_get_following_count(page):
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    number_pattern = re.compile(r'\d( (M|k))?')
+    followers_elem = soup.find('a', attrs={'href': f'/{username}/verified_followers'}).find('span', string=number_pattern)
+    followers_int = str_to_int(followers_elem.text)
 
-    assert ''
+    assert isinstance(followers_int, int)
 
 
-def test_get_url(page):
-    """User page: Can we get"""
+def test_get_website(page):
+    """User page: Can we get the user's featured website"""
     env = Env()
     env.read_env()
     username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
+    page.goto(f'https://x.com/{username}', timeout=10000)
 
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
-
-    html = page.content()
-    soup = BeautifulSoup(html, 'html.parser')
-
-
-    assert ''
-
-
-def test_get_url_display_text(page):
-    """User page: Can we get Th user's """
-    env = Env()
-    env.read_env()
-    username = env.str("USERNAME")
-    page.goto(f'https://x.com/{username}/followers', timeout=10000)
-
-    page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+    page.locator('article[data-testid="tweet"]').first.wait_for(timeout=10000)
 
     html = page.content()
     soup = BeautifulSoup(html, 'html.parser')
 
+    # profile_header: only available on profiles that include a location and/or a website
+    profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
+    user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
+    url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
+    redirected_url = user_url.find(string=url_pattern)
 
-    assert ''
+    assert redirected_url is not None

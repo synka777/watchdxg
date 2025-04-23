@@ -4,6 +4,7 @@ All Rights Reserved.
 Released under the MIT license
 """
 from src.infra import enforce_login, AsyncBrowserManager
+from src.utils import str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
 from src.classes import Post
@@ -12,7 +13,6 @@ from time import sleep
 import asyncio
 import random
 import locale
-import utils
 import re
 
 env = Env()
@@ -60,15 +60,16 @@ async def get_user_data(handle):
 
         number_pattern = re.compile(r'\d( (M|k))?')
         following_elem = soup.find('a', attrs={'href': f'/{handle}/following'}).find('span', string=number_pattern)
-        following_int = utils.str_to_int(following_elem.text)
+        following_int = str_to_int(following_elem.text)
         followers_elem = soup.find('a', attrs={'href': f'/{handle}/verified_followers'}).find('span', string=number_pattern)
-        followers_int = utils.str_to_int(followers_elem.text)
+        followers_int = str_to_int(followers_elem.text)
 
+        # profile_header: only available on profiles that include a location and/or a website
         profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
         if profile_header:
             user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
-            url_pattern = re.compile(r'\w+.\w+\/\w+')
-            user_url_display = user_url.find(string=url_pattern)
+            url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
+            redirected_url = user_url.find(string=url_pattern)
 
         print('Username:', user_name_elem.text.strip())
         print('Bio:', bio_elem.text)
@@ -76,7 +77,7 @@ async def get_user_data(handle):
         print('Followers:', followers_int)
         print('Following:', following_int)
         if profile_header:
-            print('User URL:', user_url['href'], user_url_display.text)
+            print('User URL:', user_url['href'], redirected_url.text)
 
         # TODO: Create a user model and save+return user data into a user instance
     finally:
