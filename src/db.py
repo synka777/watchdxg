@@ -137,11 +137,14 @@ def create_database():
     Creates the database for storing follower data.
     """
     dbname = settings['db']['dbname']
-    connection = get_connection()
+    connection = get_connection(init=True)
 
     if connection is None:
         print('Could not establish connection to PostgreSQL. Exiting...')
         return
+
+    # Enable autocommit mode
+    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -178,6 +181,9 @@ def create_db_user():
         print('Could not establish connection to PostgreSQL. Exiting...')
         return
 
+    # Enable autocommit mode
+    connection.autocommit = True
+
     cursor = connection.cursor()
 
     # Create the new user if it doesn't exist
@@ -185,7 +191,7 @@ def create_db_user():
         cursor.execute(sql.SQL('SELECT 1 FROM pg_catalog.pg_user WHERE usename = %s'), (username,))
         result = cursor.fetchone()
         if not result:
-            cursor.execute(sql.SQL('CREATE USER {} WITH PASSWORD %s').format(sql.Identifier(username)), (password,))
+            cursor.execute(sql.SQL('CREATE ROLE {} WITH LOGIN PASSWORD %s').format(sql.Identifier(username)), (password,))
             print(f'User "{username}" created successfully.')
         else:
             print(f'User "{username}" already exists.')
@@ -212,6 +218,9 @@ def grant_privileges():
         print('Could not establish connection to the database. Exiting...')
         return
 
+    # Enable autocommit mode
+    connection.autocommit = True
+
     cursor = connection.cursor()
 
     # Grant privileges on the database to the user
@@ -231,7 +240,7 @@ def grant_privileges():
             sql.SQL('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {}').format(sql.Identifier(username))
         )
         connection.commit()
-        print(f'Granted all privileges on the "{dbname}" database to "{username}".')
+        print(f'Granted all privileges on the "{dbname}" database to user "{username}".')
     except Exception as e:
         print(f'Error: Could not grant privileges: {e}')
     finally:
@@ -250,6 +259,9 @@ def create_account_table():
         print('Could not establish connection to database. Exiting...')
         return
 
+    # Enable autocommit mode
+    connection.autocommit = True
+
     cursor = connection.cursor()
 
     create_table_query = """
@@ -262,7 +274,6 @@ def create_account_table():
 
     try:
         cursor.execute(create_table_query)
-        connection.commit()
         print('Followers table created successfully.')
     except Exception as e:
         print(f'Error: Could not create table: {e}')
@@ -281,6 +292,9 @@ def create_follower_table():
     if connection is None:
         print('Could not establish connection to database. Exiting...')
         return
+
+    # Enable autocommit mode
+    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -313,11 +327,11 @@ def create_follower_table():
 if __name__ == '__main__':
     get_settings()
 
-    # Create the user
-    create_db_user()
-
     # Create the database before creating the user
     create_database()
+
+    # Create the user
+    create_db_user()
 
     # Grant privileges to the user
     grant_privileges()
