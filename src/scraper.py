@@ -4,6 +4,7 @@ All Rights Reserved.
 Released under the MIT license
 """
 from infra import enforce_login, AsyncBrowserManager
+from db import execute_query, setup_db, add_account
 from utils import str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -25,7 +26,7 @@ def block_user():
 
 
 @enforce_login
-async def get_user_data(handle):
+async def get_user_data(handle, uid):
     # Using one context per get_usr_data() call is lighter
     # than instanciating one browser per call instead
     try:
@@ -79,12 +80,28 @@ async def get_user_data(handle):
         if profile_header:
             print('User URL:', user_url['href'], redirected_url.text)
 
-        # TODO: Create a user model and save+return user data into a user instance
+        insert_query = """INSERT INTO followers (
+            account_id,
+            handle, username,
+            bio, created_at,
+            following_count,
+            follower_count,
+            featured_url
+        )"""
+        execute_query(insert_query, (
+            uid,
+            handle,
+            user_name_elem.text.strip(),
+            bio_elem.text,
+            date_joined,
+            following_int,
+            followers_int,
+            redirected_url.text
+        ))
+
     finally:
         # Don't forget to close the current context or it could cause issues down the line
         await page.close()
-
-    return
 
 
 @enforce_login
@@ -108,27 +125,27 @@ async def get_user_handles():
     return user_handles
 
 
-def is_rock_bottom(driver):
-    return driver.execute_script("""
-            var scrollable = document.documentElement || document.body;
-            return (scrollable.scrollHeight - scrollable.scrollTop) <= scrollable.clientHeight;
-        """)
+# def is_rock_bottom(driver):
+#     return driver.execute_script("""
+#             var scrollable = document.documentElement || document.body;
+#             return (scrollable.scrollHeight - scrollable.scrollTop) <= scrollable.clientHeight;
+#         """)
 
 
-# function to handle dynamic page content loading - using Selenium
-def scroll(driver):
-    driver.execute_script('window.scrollBy(0, document.body.scrollHeight/10);')
-    new_height = driver.execute_script('return document.body.scrollHeight')
-    return new_height
+# # function to handle dynamic page content loading - using Selenium
+# def scroll(driver):
+#     driver.execute_script('window.scrollBy(0, document.body.scrollHeight/10);')
+#     new_height = driver.execute_script('return document.body.scrollHeight')
+#     return new_height
 
 
-def clean_stat(stat):
-    return stat.replace('0', '') if stat.startswith('0') else stat
+# def clean_stat(stat):
+#     return stat.replace('0', '') if stat.startswith('0') else stat
 
 
-def get_stats(stats_grp, stat_pos):
-    subset = stats_grp[stat_pos].select('span span')
-    return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
+# def get_stats(stats_grp, stat_pos):
+#     subset = stats_grp[stat_pos].select('span span')
+#     return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
 
 
 @enforce_login
@@ -270,7 +287,7 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
 # Main logic
 
 @enforce_login
-async def main():
+async def main(uid):
     # Initialize main variables
     user_handles: list[str] = []
 
@@ -283,11 +300,20 @@ async def main():
     user_handles = await get_user_handles()
     # user_handles = [get_user_handles()[0]]
 
-    tasks = [get_user_data(handle) for handle in user_handles]
+    tasks = [get_user_data(handle, uid) for handle in user_handles]
     followers = await asyncio.gather(*tasks, return_exceptions=True)
 
     await AsyncBrowserManager.close()
 
 
+async def start():
+    if not setup_db():
+        return
+    uid = add_account()
+    if not uid:
+        return
+    await main(uid)
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    asyncio.run(start())

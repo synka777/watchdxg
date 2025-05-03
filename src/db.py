@@ -1,5 +1,7 @@
+from environs import Env
+from psycopg2 import sql, errors
+from psycopg2 import Error
 from pathlib import Path
-from psycopg2 import sql
 import subprocess
 import platform
 import psycopg2
@@ -61,11 +63,30 @@ def pgsql_installed_by_brew(result):
     return False
 
 
+def execute_query(connection, query, params=None, fetch=False, fetchone=False):
+    try:
+        with connection.cursor() as cur:
+            cur.execute(query, params)
+
+            if fetch:
+                return cur.fetchall()
+            if fetchone:
+                return cur.fetchone()
+    except errors.UniqueViolation as uve:
+        print(f'[INFO] Skipped duplicate: {uve}')
+        connection.rollback()
+        return True
+    except Error as e:
+        print(f'[ERROR] Database error: {e}')
+        connection.rollback()
+        return None
+
+
 ######################
 # Database management
 
 # Function to connect to PostgreSQL
-def get_connection(init=False):
+def get_default_connection(init=False):
     """
     Establishes a connection to the PostgreSQL server.
 
@@ -85,7 +106,7 @@ def get_connection(init=False):
                     if start_pgsql_w_brew():
                         print('[INFO] PostgreSQL service started successfully.')
                 else:
-                    raise RuntimeError("[ERROR] PostgreSQL does not appear to be installed with brew.")
+                    raise RuntimeError('[ERROR] PostgreSQL does not appear to be installed with brew.')
 
             # Now, if brew pgsql is running, we use macOS user
             user = getpass.getuser()
@@ -100,6 +121,8 @@ def get_connection(init=False):
             host=settings['db']['host'],
             port=settings['db']['port']
         )
+        connection.autocommit = True
+
         return connection
     except Exception as e:
         print(f'Error: Could not establish connection to PostgreSQL server: {e}')
@@ -107,7 +130,7 @@ def get_connection(init=False):
 
 
 # Function to connect to the created database
-def get_db_connection():
+def get_connection():
     """
     Establishes a connection to the PostgreSQL database.
 
@@ -137,14 +160,12 @@ def create_database():
     Creates the database for storing follower data.
     """
     dbname = settings['db']['dbname']
-    connection = get_connection(init=True)
+    connection = get_default_connection(init=True)
+    success = True
 
     if connection is None:
         print('Could not establish connection to PostgreSQL. Exiting...')
         return
-
-    # Enable autocommit mode
-    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -155,13 +176,16 @@ def create_database():
         if not result:
             cursor.execute(f'CREATE DATABASE {dbname};')
             print(f'Database "{dbname}" created successfully.')
+
         else:
             print(f'Database "{dbname}" already exists.')
     except Exception as e:
+        success = False
         print(f'Error: Could not create database: {e}')
     finally:
         cursor.close()
         connection.close()
+        return success
 
 
 # Function to create a new database user
@@ -173,16 +197,14 @@ def create_db_user():
         username (str): The username for the new user.
         password (str): The password for the new user.
     """
-    connection = get_connection(init=True)
+    connection = get_default_connection(init=True)
     username = settings['db']['user']
     password = settings['db']['password']
+    success = True
 
     if connection is None:
         print('Could not establish connection to PostgreSQL. Exiting...')
         return
-
-    # Enable autocommit mode
-    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -196,10 +218,12 @@ def create_db_user():
         else:
             print(f'User "{username}" already exists.')
     except Exception as e:
+        success = False
         print(f'Error: Could not create user: {e}')
     finally:
         cursor.close()
         connection.close()
+        return success
 
 
 # Function to grant privileges to a user
@@ -210,16 +234,14 @@ def grant_privileges():
     Args:
         username (str): The username to whom privileges will be granted.
     """
-    connection = get_db_connection()
+    connection = get_connection()
     username = settings['db']['user']
     dbname = settings['db']['dbname']
+    success = True
 
     if connection is None:
         print('Could not establish connection to the database. Exiting...')
         return
-
-    # Enable autocommit mode
-    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -242,10 +264,12 @@ def grant_privileges():
         connection.commit()
         print(f'Granted all privileges on the "{dbname}" database to user "{username}".')
     except Exception as e:
+        success = False
         print(f'Error: Could not grant privileges: {e}')
     finally:
         cursor.close()
         connection.close()
+        return success
 
 
 # Function to create the X account's table
@@ -253,14 +277,12 @@ def create_account_table():
     """
     Creates a table to store X accounts that need to be managed
     """
-    connection = get_db_connection()
+    connection = get_connection()
+    success = True
 
     if connection is None:
         print('Could not establish connection to database. Exiting...')
         return
-
-    # Enable autocommit mode
-    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -268,33 +290,32 @@ def create_account_table():
     CREATE TABLE IF NOT EXISTS accounts (
         id SERIAL PRIMARY KEY,
         handle VARCHAR(255),
-        password VARCHAR(255)
+        UNIQUE (handle)
     );
     """
 
     try:
         cursor.execute(create_table_query)
-        print('Followers table created successfully.')
+        print('Accounts table created successfully.')
     except Exception as e:
+        success = False
         print(f'Error: Could not create table: {e}')
     finally:
         cursor.close()
         connection.close()
-
+        return success
 
 # Function to create the table to store follower data
 def create_follower_table():
     """
     Creates a table for storing follower data in the database.
     """
-    connection = get_db_connection()
+    connection = get_connection()
+    success = True
 
     if connection is None:
         print('Could not establish connection to database. Exiting...')
         return
-
-    # Enable autocommit mode
-    connection.autocommit = True
 
     cursor = connection.cursor()
 
@@ -309,7 +330,8 @@ def create_follower_table():
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         following_count INTEGER,
         follower_count INTEGER,
-        featured_url VARCHAR
+        featured_url VARCHAR,
+        UNIQUE (handle, created_at)
     );
     """
 
@@ -318,24 +340,46 @@ def create_follower_table():
         connection.commit()
         print('Followers table created successfully.')
     except Exception as e:
+        success = False
         print(f'Error: Could not create table: {e}')
     finally:
         cursor.close()
         connection.close()
+        return success
 
 
-if __name__ == '__main__':
+def add_account():
+    env = Env()
+    env.read_env()
+    add_acc_query = 'INSERT INTO accounts (handle) VALUES (%s) RETURNING id'
+    res = execute_query(
+        get_default_connection(),
+        add_acc_query,
+        # The trailing comma after username is important so that Python understand it's in a tuple
+        (env.str('USERNAME'),),
+        fetchone=True
+    )
+    return res[0] if res else None
+
+
+# if __name__ == '__main__':
+def setup_db():
     get_settings()
 
-    # Create the database before creating the user
-    create_database()
+    if not create_database():
+        print('[ERROR] Failed to create database.')
+        return False
+    if not create_db_user():
+        print('[ERROR] Failed to create DB user.')
+        return False
+    if not grant_privileges():
+        print('[ERROR] Failed to grant privileges.')
+        return False
+    if not create_account_table():
+        print('[ERROR] Failed to create account table.')
+        return False
+    if not create_follower_table():
+        print('[ERROR] Failed to create follower table.')
+        return False
 
-    # Create the user
-    create_db_user()
-
-    # Grant privileges to the user
-    grant_privileges()
-
-    # Then create tables
-    create_account_table()
-    create_follower_table()
+    return True
