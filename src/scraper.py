@@ -3,8 +3,8 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
+from db import execute_query, setup_db, add_account, get_connection
 from infra import enforce_login, AsyncBrowserManager
-from db import execute_query, setup_db, add_account
 from utils import str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -80,24 +80,32 @@ async def get_user_data(handle, uid):
         if profile_header:
             print('User URL:', user_url['href'], redirected_url.text)
 
-        insert_query = """INSERT INTO followers (
+        insert_query = """
+        INSERT INTO followers (
             account_id,
             handle, username,
             bio, created_at,
             following_count,
             follower_count,
             featured_url
-        )"""
-        execute_query(insert_query, (
-            uid,
-            handle,
-            user_name_elem.text.strip(),
-            bio_elem.text,
-            date_joined,
-            following_int,
-            followers_int,
-            redirected_url.text
-        ))
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        execute_query(
+            get_connection(),
+            insert_query,
+            (
+                uid,
+                handle,
+                user_name_elem.text.strip(),
+                bio_elem.text,
+                date_joined,
+                following_int,
+                followers_int,
+                # Display url could be cropped but should be enough to get the domain name and first url params
+                # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
+                redirected_url.text
+            )
+        )
 
     finally:
         # Don't forget to close the current context or it could cause issues down the line
