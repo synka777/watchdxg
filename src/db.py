@@ -148,6 +148,8 @@ def get_connection():
             host=settings['db']['host'],
             port=settings['db']['port']
         )
+        connection.autocommit = True
+
         return connection
     except Exception as e:
         print(f'Error: Could not establish connection to database {dbname}: {e}')
@@ -353,13 +355,23 @@ def add_account():
     env.read_env()
     add_acc_query = 'INSERT INTO accounts (handle) VALUES (%s) RETURNING id'
     res = execute_query(
-        get_default_connection(),
+        get_connection(),
         add_acc_query,
         # The trailing comma after username is important so that Python understand it's in a tuple
         (env.str('USERNAME'),),
         fetchone=True
     )
-    return res[0] if res else None
+    if res and type(res) == bool:
+        res = execute_query(
+            get_connection(),
+            'SELECT id FROM accounts WHERE handle = %s;',
+            # The trailing comma after username is important so that Python understand it's in a tuple
+            (env.str('USERNAME'),),
+            fetchone=True
+        )
+        return res[0]
+    else:
+        return None
 
 
 # if __name__ == '__main__':
