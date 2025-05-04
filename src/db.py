@@ -350,7 +350,8 @@ def create_follower_table():
         return success
 
 
-def add_account():
+def register_get_uid():
+    get_settings()
     env = Env()
     env.read_env()
     add_acc_query = 'INSERT INTO accounts (handle) VALUES (%s) RETURNING id'

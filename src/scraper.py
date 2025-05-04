@@ -3,9 +3,9 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from db import execute_query, setup_db, add_account, get_connection
+from db import execute_query, setup_db, register_get_uid, get_connection
 from infra import enforce_login, AsyncBrowserManager
-from utils import str_to_int
+from utils import str_to_int, parse_args
 from bs4 import BeautifulSoup
 from datetime import datetime
 from classes import Post
@@ -315,10 +315,16 @@ async def main(uid):
 
 
 async def start():
-    if not setup_db():
-        return
-    uid = add_account()
+    args = parse_args()
+
+    if args.setup:
+        print('[INFO] Running with setup flag')
+        if not setup_db():
+            return
+
+    uid = register_get_uid()
     if not uid:
+        print('[ERROR] Unable to get account id')
         return
     await main(uid)
 

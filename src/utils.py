@@ -1,3 +1,4 @@
+import argparse
 
 def str_to_int(str):
     multiplier = 1
@@ -15,3 +16,9 @@ def str_to_int(str):
     else:
         str = str.replace(',', '.')
     return int(float(str) * multiplier)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Script with optional --setup flag")
+    parser.add_argument('--setup', action='store_true', help='Run with database setup operations')
+    return parser.parse_args()
