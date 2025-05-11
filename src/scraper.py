@@ -81,12 +81,12 @@ async def get_user_data(handle, uid):
             print('User URL:', user_url['href'], redirected_url.text)
 
         insert_query = """
-        INSERT INTO followers (
+        INSERT INTO users (
             account_id,
             handle, username,
             bio, created_at,
             following_count,
-            follower_count,
+            followers_count,
             featured_url
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """

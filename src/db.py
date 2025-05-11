@@ -1,6 +1,5 @@
 from environs import Env
-from psycopg2 import sql, errors
-from psycopg2 import Error
+from psycopg2 import sql, errors, Error
 from pathlib import Path
 import subprocess
 import platform
@@ -159,7 +158,7 @@ def get_connection():
 # Function to create the database
 def create_database():
     """
-    Creates the database for storing follower data.
+    Creates the database for storing user data.
     """
     dbname = settings['db']['dbname']
     connection = get_default_connection(init=True)
@@ -307,10 +306,10 @@ def create_account_table():
         connection.close()
         return success
 
-# Function to create the table to store follower data
-def create_follower_table():
+# Function to create the table to store user data
+def create_users_table():
     """
-    Creates a table for storing follower data in the database.
+    Creates a table for storing user data in the database.
     """
     connection = get_connection()
     success = True
@@ -323,7 +322,7 @@ def create_follower_table():
 
     # SQL to create the table (you can modify the columns as needed)
     create_table_query = """
-    CREATE TABLE IF NOT EXISTS followers (
+    CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
         handle VARCHAR(255),
@@ -331,8 +330,9 @@ def create_follower_table():
         bio TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         following_count INTEGER,
-        follower_count INTEGER,
+        followers_count INTEGER,
         featured_url VARCHAR,
+        follower BOOLEAN,
         UNIQUE (handle, created_at)
     );
     """
@@ -340,7 +340,7 @@ def create_follower_table():
     try:
         cursor.execute(create_table_query)
         connection.commit()
-        print('Followers table created successfully.')
+        print('Users table created successfully.')
     except Exception as e:
         success = False
         print(f'Error: Could not create table: {e}')
@@ -362,17 +362,20 @@ def register_get_uid():
         (env.str('USERNAME'),),
         fetchone=True
     )
+
     if res and type(res) == bool:
         res = execute_query(
             get_connection(),
             'SELECT id FROM accounts WHERE handle = %s;',
-            # The trailing comma after username is important so that Python understand it's in a tuple
             (env.str('USERNAME'),),
             fetchone=True
         )
-        return res[0]
+        uid = res[0]
     else:
-        return None
+        print(f'[INFO] Registered {env.str('USERNAME')} into the accounts table')
+        uid = res[0]
+
+    return uid
 
 
 # if __name__ == '__main__':
@@ -391,8 +394,8 @@ def setup_db():
     if not create_account_table():
         print('[ERROR] Failed to create account table.')
         return False
-    if not create_follower_table():
-        print('[ERROR] Failed to create follower table.')
+    if not create_users_table():
+        print('[ERROR] Failed to create users table.')
         return False
 
     return True

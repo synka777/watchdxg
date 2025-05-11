@@ -29,4 +29,4 @@ class Post:
         self.likes = likes
         self.views = views
 
-# TODO: Add a class for followers
+# TODO: Add a class for users
