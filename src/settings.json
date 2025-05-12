@@ -1,4 +1,7 @@
 {
+    "runtime": {
+        "max_parallel": 3
+    },
     "db": {
         "host": "localhost",
         "port": "5432",

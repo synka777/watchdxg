@@ -3,9 +3,9 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
+from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
 from db import execute_query, setup_db, register_get_uid, get_connection
-from infra import enforce_login, AsyncBrowserManager
-from utils import str_to_int, parse_args
+from utils import parse_args, get_settings, settings, str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
 from classes import Post
@@ -19,17 +19,22 @@ import re
 env = Env()
 env.read_env()
 locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
+get_settings() # Makes the app settings available during runtime
+MAX_PARALLEL = settings['runtime']['max_parallel']
+semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 
 
 def block_user():
     pass
 
 
-@enforce_login
+# @enforce_login
+@apply_concurrency_limit(semaphore)
 async def get_user_data(handle, uid):
     # Using one context per get_usr_data() call is lighter
     # than instanciating one browser per call instead
     try:
+        print('START', handle)
         page = await AsyncBrowserManager.get_new_page()
         url = f'https://x.com/{handle}'
         await page.goto(url)
@@ -110,6 +115,7 @@ async def get_user_data(handle, uid):
     finally:
         # Don't forget to close the current context or it could cause issues down the line
         await page.close()
+        print('STOP', handle)
 
 
 @enforce_login

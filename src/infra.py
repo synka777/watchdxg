@@ -3,6 +3,7 @@ from exceptions import NotLoggedInError
 from functools import wraps
 from environs import Env
 from time import sleep
+import traceback
 import asyncio
 import random
 
@@ -136,6 +137,21 @@ def delay(min_sec=4, max_sec=6):
         return wrapper
     return decorator
 
+
+def apply_concurrency_limit(semaphore):
+    def decorator(func): # <= Doesn't need to be async
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            async with semaphore:
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    print(f'Exception in {func.__name__}({args}, {kwargs}):\n{traceback.format_exc()}')
+                    # raise  # optional: re-raise if we want gather() to receive it
+        return wrapper
+    return decorator
+
+
 # Decorator function: when you don't need to pass custom parameters
 def enforce_login(func):
     @wraps(func)
@@ -170,7 +186,6 @@ def enforce_login(func):
             print('[DECORATOR] Unexpected error:', e)
             raise
     return wrapper
-
 
 
 ####################

@@ -1,28 +1,15 @@
-from environs import Env
 from psycopg2 import sql, errors, Error
-from pathlib import Path
+from utils import get_settings, settings
+from environs import Env
 import subprocess
 import platform
 import psycopg2
 import getpass
-import json
 import re
-
-settings = {}
 
 
 ###################
 # Helper functions
-
-def get_settings():
-    global settings
-    current_dir = Path(__file__).resolve().parent
-    if len(settings) == 0:
-        with open(f'{current_dir}/settings.json', 'r') as read_settings:
-            for key, val in json.load(read_settings).items():
-                settings[key] = val
-    return settings
-
 
 def start_pgsql_w_brew():
     brew_start = subprocess.run(
@@ -372,7 +359,7 @@ def register_get_uid():
         )
         uid = res[0]
     else:
-        print(f'[INFO] Registered {env.str('USERNAME')} into the accounts table')
+        print(f'[INFO] Registered {env.str("USERNAME")} into the accounts table')
         uid = res[0]
 
     return uid
