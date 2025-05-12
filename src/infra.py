@@ -20,6 +20,7 @@ class AsyncBrowserManager:
     _context = None
     _page = None
     _ready = False
+    _headless = True
 
     def __new__(cls):
         """
@@ -48,7 +49,7 @@ class AsyncBrowserManager:
             # Launch the browser (not persistent)
             cls._browser = await cls._playwright.firefox.launch_persistent_context(
                 user_data_dir=env.str('FFPROFILEPATH'),
-                headless=True,
+                headless=cls._headless,
                 viewport={'width': 1920, 'height': 6000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
@@ -66,6 +67,10 @@ class AsyncBrowserManager:
 
         except Exception as e:
             print(f"[ERROR] Something went wrong: {e}")
+
+    @classmethod
+    def disable_headless(cls):
+        cls._headless = False
 
     @classmethod
     def ready(cls):

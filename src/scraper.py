@@ -92,7 +92,8 @@ async def get_user_data(handle, uid):
             bio, created_at,
             following_count,
             followers_count,
-            featured_url
+            featured_url,
+            follower
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         execute_query(
@@ -108,7 +109,8 @@ async def get_user_data(handle, uid):
                 followers_int,
                 # Display url could be cropped but should be enough to get the domain name and first url params
                 # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
-                redirected_url.text
+                redirected_url.text,
+                True
             )
         )
 
@@ -327,6 +329,9 @@ async def start():
         print('[INFO] Running with setup flag')
         if not setup_db():
             return
+
+    if args.head:
+        AsyncBrowserManager.disable_headless()
 
     uid = register_get_uid()
     if not uid:
