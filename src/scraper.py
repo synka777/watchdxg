@@ -1,12 +1,7 @@
-"""Watchdxg
-Copyright (c) 2025 Mathieu BARBE-GAYET
-All Rights Reserved.
-Released under the MIT license
-"""
-from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit, delay
-from db import execute_query, setup_db, register_get_uid, get_connection
+from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
+from db import execute_query, get_connection
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from utils import parse_args, get_settings, settings, str_to_int
+from tools.utils import get_settings, settings, str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
 from classes import Post
@@ -35,7 +30,6 @@ async def get_user_data(handle, uid):
     max_retries = settings['runtime']['max_retries']
     for attempt in range(max_retries):
         try:
-            print('START', handle)
             # Using one context per get_usr_data() call is lighter
             # than instanciating one browser per call instead
             page = await AsyncBrowserManager.get_new_page()
@@ -133,7 +127,6 @@ async def get_user_data(handle, uid):
                 await page.close()
             except Exception:
                 pass
-    print('STOP', handle)
 
 
 @enforce_login
@@ -313,48 +306,3 @@ def get_posts(driver, url): # TODO: Revamp this function w/ new logic AND playwr
             break
         if error:
             break
-
-
-#############
-# Main logic
-
-@enforce_login
-async def main(uid):
-    # Initialize main variables
-    user_handles: list[str] = []
-
-    own_account = env.str('USERNAME')
-    followers_url = f'https://x.com/{own_account}/followers'
-    page = AsyncBrowserManager.get_page()
-
-    # Then process the soup to get the user handle of each follower
-    await page.goto(followers_url)
-    user_handles = await get_user_handles()
-    # user_handles = [get_user_handles()[0]]
-
-    tasks = [get_user_data(handle, uid) for handle in user_handles]
-    followers = await asyncio.gather(*tasks, return_exceptions=True)
-
-    await AsyncBrowserManager.close()
-
-
-async def start():
-    args = parse_args()
-
-    if args.setup:
-        print('[INFO] Running with setup flag')
-        if not setup_db():
-            return
-
-    if args.head:
-        AsyncBrowserManager.disable_headless()
-
-    uid = register_get_uid()
-    if not uid:
-        print('[ERROR] Unable to get account id')
-        return
-    await main(uid)
-
-
-if __name__ == '__main__':
-    asyncio.run(start())

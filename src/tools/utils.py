@@ -15,9 +15,9 @@ def parse_args():
 
 def get_settings():
     global settings
-    current_dir = Path(__file__).resolve().parent
+    root_dir = Path(__file__).resolve().parent.parent.parent
     if len(settings) == 0:
-        with open(f'{current_dir}/settings.json', 'r') as read_settings:
+        with open(f'{root_dir}/settings.json', 'r') as read_settings:
             for key, val in json.load(read_settings).items():
                 settings[key] = val
     return settings

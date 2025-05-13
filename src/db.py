@@ -1,5 +1,5 @@
 from psycopg2 import sql, errors, Error
-from utils import get_settings, settings
+from tools.utils import get_settings, settings
 from environs import Env
 import subprocess
 import platform
