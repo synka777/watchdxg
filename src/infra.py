@@ -135,7 +135,6 @@ def delay(min_sec=4, max_sec=6):
         def wrapper(*args, **kwargs): # Defines the function that'll wrap the decorated func
             sleep_time = random.uniform(min_sec, max_sec)
             sleep(sleep_time)
-            print(f'Sleeping for {sleep_time:.2f}s...')
 
             result = func(*args, **kwargs) # Decorated func is executed here
             return result # Returns the result of the decorated func

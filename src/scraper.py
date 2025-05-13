@@ -3,8 +3,9 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 Released under the MIT license
 """
-from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
+from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit, delay
 from db import execute_query, setup_db, register_get_uid, get_connection
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from utils import parse_args, get_settings, settings, str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -31,93 +32,108 @@ def block_user():
 # @enforce_login
 @apply_concurrency_limit(semaphore)
 async def get_user_data(handle, uid):
-    # Using one context per get_usr_data() call is lighter
-    # than instanciating one browser per call instead
-    try:
-        print('START', handle)
-        page = await AsyncBrowserManager.get_new_page()
-        url = f'https://x.com/{handle}'
-        await page.goto(url)
+    max_retries = settings['runtime']['max_retries']
+    for attempt in range(max_retries):
+        try:
+            print('START', handle)
+            # Using one context per get_usr_data() call is lighter
+            # than instanciating one browser per call instead
+            page = await AsyncBrowserManager.get_new_page()
+            url = f'https://x.com/{handle}'
+            await page.goto(url)
 
-        # Wait for one of the last elements of the page to load and THEN get the DOM
-        await page.wait_for_selector('article[data-testid="tweet"]')
-        html = await page.content()
-        soup = BeautifulSoup(html, 'html.parser')
+            # Wait for one of the last elements of the page to load and THEN get the DOM
+            await page.wait_for_selector('section[role="region"]')
+            html = await page.content()
+            soup = BeautifulSoup(html, 'html.parser')
 
-        user_name_wrapper = soup.find('div', attrs={'data-testid': 'UserName'})
-        user_name_elem = next(
-            (div for div in user_name_wrapper.find_all('div')
-            if div.get_text(strip=True) and not div.find('div')),  # Ensure no nested <div>
-            None
-        )
-
-        bio_elem_wrapper = soup.find(attrs={'data-testid': 'UserDescription'})
-        bio_elem = next(
-            (div for div in bio_elem_wrapper.find_all('span')
-            if div.get_text(strip=True)),
-            None
-        )
-
-        date_pattern = re.compile(r'\d{4}')
-        joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
-        date_str_list = joined_elem.text.strip().split(' ')[-2:]
-        date_str = ' '.join(date_str_list)
-        date_joined = datetime.strptime(date_str, '%B %Y')
-
-        number_pattern = re.compile(r'\d( (M|k))?')
-        following_elem = soup.find('a', attrs={'href': f'/{handle}/following'}).find('span', string=number_pattern)
-        following_int = str_to_int(following_elem.text)
-        followers_elem = soup.find('a', attrs={'href': f'/{handle}/verified_followers'}).find('span', string=number_pattern)
-        followers_int = str_to_int(followers_elem.text)
-
-        # profile_header: only available on profiles that include a location and/or a website
-        profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
-        if profile_header:
-            user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
-            url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
-            redirected_url = user_url.find(string=url_pattern)
-
-        print('Username:', user_name_elem.text.strip())
-        print('Bio:', bio_elem.text)
-        print('Joined:', date_joined)
-        print('Followers:', followers_int)
-        print('Following:', following_int)
-        if profile_header:
-            print('User URL:', user_url['href'], redirected_url.text)
-
-        insert_query = """
-        INSERT INTO users (
-            account_id,
-            handle, username,
-            bio, created_at,
-            following_count,
-            followers_count,
-            featured_url,
-            follower
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        execute_query(
-            get_connection(),
-            insert_query,
-            (
-                uid,
-                handle,
-                user_name_elem.text.strip(),
-                bio_elem.text,
-                date_joined,
-                following_int,
-                followers_int,
-                # Display url could be cropped but should be enough to get the domain name and first url params
-                # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
-                redirected_url.text,
-                True
+            user_name_wrapper = soup.find('div', attrs={'data-testid': 'UserName'})
+            user_name_elem = next(
+                (div for div in user_name_wrapper.find_all('div')
+                if div.get_text(strip=True) and not div.find('div')),  # Ensure no nested <div>
+                None
             )
-        )
 
-    finally:
-        # Don't forget to close the current context or it could cause issues down the line
-        await page.close()
-        print('STOP', handle)
+            bio_elem_wrapper = soup.find(attrs={'data-testid': 'UserDescription'})
+            if bio_elem_wrapper:
+                bio_elem = next(
+                    (div for div in bio_elem_wrapper.find_all('span')
+                    if div.get_text(strip=True)),
+                    None
+                )
+
+            date_pattern = re.compile(r'\d{4}')
+            joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
+            date_str_list = joined_elem.text.strip().split(' ')[-2:]
+            date_str = ' '.join(date_str_list)
+            date_joined = datetime.strptime(date_str, '%B %Y')
+
+            number_pattern = re.compile(r'\d( (M|k))?')
+            following_elem = soup.find('a', attrs={'href': f'/{handle}/following'}).find('span', string=number_pattern)
+            following_int = str_to_int(following_elem.text)
+            followers_elem = soup.find('a', attrs={'href': f'/{handle}/verified_followers'}).find('span', string=number_pattern)
+            followers_int = str_to_int(followers_elem.text)
+
+            # profile_header: only available on profiles that include a location and/or a website
+            profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
+            if profile_header:
+                user_url = profile_header.find(attrs={'data-testid': 'UserUrl'})
+                if user_url:
+                    url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
+                    redirected_url = user_url.find(string=url_pattern)
+
+            print('Username:', user_name_elem.text.strip())
+            if bio_elem_wrapper:
+                print('Bio:', bio_elem.text)
+            print('Joined:', date_joined)
+            print('Followers:', followers_int)
+            print('Following:', following_int)
+            if profile_header and user_url:
+                print('User URL:', user_url['href'], redirected_url.text)
+
+            insert_query = """
+            INSERT INTO users (
+                account_id,
+                handle, username,
+                bio, created_at,
+                following_count,
+                followers_count,
+                featured_url,
+                follower
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            execute_query(
+                get_connection(),
+                insert_query,
+                (
+                    uid,
+                    handle,
+                    user_name_elem.text.strip(),
+                    bio_elem.text if bio_elem_wrapper and bio_elem else None,
+                    date_joined,
+                    following_int,
+                    followers_int,
+                    # Display url could be cropped but should be enough to get the domain name and first url params
+                    # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
+                    redirected_url.text if user_url and redirected_url else None,
+                    True
+                )
+            )
+            break
+
+        except (PlaywrightTimeoutError, Exception) as e:
+            print(f'[WARN] Attempt {attempt+1} failed for {handle}: {e}')
+            if attempt == max_retries - 1:
+                print(f'[ERROR] Giving up on {handle} after {max_retries} attempts.')
+            else:
+                await asyncio.sleep(2 + attempt * 2)  # Exponential backoff
+
+        finally:
+            try:
+                await page.close()
+            except Exception:
+                pass
+    print('STOP', handle)
 
 
 @enforce_login
