@@ -1,4 +1,59 @@
+from db import execute_query, get_connection
 from datetime import datetime
+
+class XUser:
+    def __init__(self,
+            account_id: int,
+            handle: str, username: str,
+            bio: str, created_at: datetime,
+            following_count: int,
+            followers_count: int,
+            featured_url: str,
+            follower: bool
+        ):
+            self.account_id = account_id,
+            self.handle = handle,
+            self.username = username,
+            self.bio = bio,
+            self.created_at = created_at ,
+            self.following_count = following_count,
+            self.followers_count = followers_count,
+            self.featured_url = featured_url,
+            self.follower = follower
+
+    def dataset_fill_up():
+        pass
+
+    def insert(self):
+        insert_query = """
+            INSERT INTO users (
+                account_id,
+                handle, username,
+                bio, created_at,
+                following_count,
+                followers_count,
+                featured_url,
+                follower
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+        try:
+            execute_query(
+                get_connection(),
+                insert_query,
+                (
+                    self.account_id,
+                    self.handle, self.username,
+                    self.bio, self.created_at,
+                    self.following_count,
+                    self.followers_count,
+                    self.featured_url,
+                    self.follower
+                )
+            )
+            return True
+        except Exception as e:
+            print('[ERROR] Insertion into database failed', e)
+            # raise
 
 
 class Post:
@@ -29,4 +84,3 @@ class Post:
         self.likes = likes
         self.views = views
 
-# TODO: Add a class for users

@@ -1,9 +1,9 @@
 from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
-from db import execute_query, get_connection
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from tools.utils import get_settings, settings, str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
+from classes import XUser
 from classes import Post
 from environs import Env
 from time import sleep
@@ -26,7 +26,7 @@ def block_user():
 
 # @enforce_login
 @apply_concurrency_limit(semaphore)
-async def get_user_data(handle, uid):
+async def get_user_data(handle, uid, follower=True):
     max_retries = settings['runtime']['max_retries']
     for attempt in range(max_retries):
         try:
@@ -76,44 +76,30 @@ async def get_user_data(handle, uid):
                     url_pattern = re.compile(r'\w+\.\w+(\/\w+)?')
                     redirected_url = user_url.find(string=url_pattern)
 
-            print('Username:', user_name_elem.text.strip())
+            username = user_name_elem.text.strip()
+            bio = bio_elem.text if bio_elem_wrapper and bio_elem else None
+            # Display url could be cropped but should be enough to get the domain name and first url params
+            # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
+            redirected_url = redirected_url.text if user_url and redirected_url else None
+
+            print('Username:', username)
             if bio_elem_wrapper:
-                print('Bio:', bio_elem.text)
+                print('Bio:', bio)
             print('Joined:', date_joined)
             print('Followers:', followers_int)
             print('Following:', following_int)
             if profile_header and user_url:
-                print('User URL:', user_url['href'], redirected_url.text)
+                print('User URL:', user_url['href'], redirected_url)
 
-            insert_query = """
-            INSERT INTO users (
-                account_id,
+            return XUser(
+                uid,
                 handle, username,
-                bio, created_at,
-                following_count,
-                followers_count,
-                featured_url,
+                bio, date_joined,
+                following_int,
+                followers_int,
+                redirected_url,
                 follower
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            execute_query(
-                get_connection(),
-                insert_query,
-                (
-                    uid,
-                    handle,
-                    user_name_elem.text.strip(),
-                    bio_elem.text if bio_elem_wrapper and bio_elem else None,
-                    date_joined,
-                    following_int,
-                    followers_int,
-                    # Display url could be cropped but should be enough to get the domain name and first url params
-                    # Switch to user_url['href'] and follow url with playwright to get the full actual link if needed
-                    redirected_url.text if user_url and redirected_url else None,
-                    True
-                )
             )
-            break
 
         except (PlaywrightTimeoutError, Exception) as e:
             print(f'[WARN] Attempt {attempt+1} failed for {handle}: {e}')
