@@ -1,4 +1,4 @@
-from db import execute_query, get_connection
+from main.db import execute_query, get_connection
 import argparse
 import re
 

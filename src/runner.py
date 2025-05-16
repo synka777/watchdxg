@@ -3,10 +3,10 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 """
 
-from infra import enforce_login, AsyncBrowserManager
-from scraper import get_user_handles, get_user_data
+from main.infra import enforce_login, AsyncBrowserManager
+from main.scraper import get_user_handles, get_user_data
 from tools.utils import parse_args, filter_known
-from db import setup_db, register_get_uid
+from main.db import setup_db, register_get_uid
 from config import get_settings, env
 import asyncio
 

@@ -56,9 +56,9 @@ Actions will then be taken accordingly (signal and block said account).
 ### Running the Script
 To start the project, run it with the `--setup` flag once:
 ```bash
-python scraper.py --setup
+python src/runner.py --setup
 ```
 Then, simply do:
 ```bash
-python scraper.py
+python src/runner.py
 ```
