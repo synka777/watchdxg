@@ -1,21 +1,19 @@
 from infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from tools.utils import get_settings, settings, str_to_int
+from tools.utils import str_to_int
+from config import settings, env
 from bs4 import BeautifulSoup
 from datetime import datetime
 from classes import XUser
 from classes import Post
-from environs import Env
 from time import sleep
 import asyncio
 import random
 import locale
 import re
 
-env = Env()
-env.read_env()
+
 locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
-get_settings() # Makes the app settings available during runtime
 MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 

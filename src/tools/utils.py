@@ -1,9 +1,25 @@
+from db import execute_query, get_connection
 import argparse
-from pathlib import Path
-import json
 import re
 
 settings = {}
+
+
+def filter_known(handles: list[str]):
+    filtered = []
+    for handle in handles:
+        # Stop adding new handles to the processing list as soon as a handle
+        # is found in database and return the result
+        if execute_query(
+                    get_connection(),
+                    'SELECT * FROM users WHERE handle = %s',
+                    params = (handle,),
+                    fetchone = True
+                ):
+            return filtered
+        else:
+            filtered += handle
+    return filtered # filtered == handles at this point
 
 
 def parse_args():
@@ -11,16 +27,6 @@ def parse_args():
     parser.add_argument('--setup', action='store_true', help='Run with database setup operations')
     parser.add_argument('--head', action='store_true', help='Run firefox in headed mode (visible)')
     return parser.parse_args()
-
-
-def get_settings():
-    global settings
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    if len(settings) == 0:
-        with open(f'{root_dir}/settings.json', 'r') as read_settings:
-            for key, val in json.load(read_settings).items():
-                settings[key] = val
-    return settings
 
 
 def str_to_int(str):

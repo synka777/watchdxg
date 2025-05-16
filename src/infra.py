@@ -1,14 +1,12 @@
 from playwright.async_api import async_playwright
 from exceptions import NotLoggedInError
 from functools import wraps
-from environs import Env
+from config import env
 from time import sleep
 import traceback
 import asyncio
 import random
 
-env = Env()
-env.read_env()
 
 #################
 # App state mgmt

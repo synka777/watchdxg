@@ -5,14 +5,10 @@ All Rights Reserved.
 
 from infra import enforce_login, AsyncBrowserManager
 from scraper import get_user_handles, get_user_data
+from tools.utils import parse_args, filter_known
 from db import setup_db, register_get_uid
-from tools.utils import parse_args
-from classes import XUser
-from environs import Env
+from config import get_settings, env
 import asyncio
-
-env = Env()
-env.read_env()
 
 
 @enforce_login
@@ -29,16 +25,22 @@ async def main(uid):
     user_handles = await get_user_handles()
     # user_handles = [get_user_handles()[0]]
 
-    tasks = [get_user_data(handle, uid) for handle in user_handles]
-    followers = await asyncio.gather(*tasks, return_exceptions=True)
+    user_handles = filter_known(user_handles)
 
-    for follower in followers:
-        follower.insert()
+    if user_handles:
+        tasks = [get_user_data(handle, uid) for handle in user_handles]
+        followers = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for follower in followers:
+            follower.insert()
+    else:
+        print('[OK] No new users found')
 
     await AsyncBrowserManager.close()
 
 
 async def start():
+    get_settings() # Makes the app settings available during runtime
     args = parse_args()
 
     if args.setup:

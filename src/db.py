@@ -1,6 +1,5 @@
 from psycopg2 import sql, errors, Error
-from tools.utils import get_settings, settings
-from environs import Env
+from config import settings, env
 import subprocess
 import platform
 import psycopg2
@@ -338,9 +337,6 @@ def create_users_table():
 
 
 def register_get_uid():
-    get_settings()
-    env = Env()
-    env.read_env()
     add_acc_query = 'INSERT INTO accounts (handle) VALUES (%s) RETURNING id'
     res = execute_query(
         get_connection(),
@@ -367,8 +363,6 @@ def register_get_uid():
 
 # if __name__ == '__main__':
 def setup_db():
-    get_settings()
-
     if not create_database():
         print('[ERROR] Failed to create database.')
         return False
