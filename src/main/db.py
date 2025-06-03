@@ -313,6 +313,7 @@ def create_users_table():
         account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
         handle VARCHAR(255),
         username VARCHAR(255),
+        certified BOOLEAN,
         bio TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         following_count INTEGER,

@@ -18,7 +18,7 @@ def filter_known(handles: list[str]):
                 ):
             return filtered
         else:
-            filtered += handle
+            filtered.append(handle)
     return filtered # filtered == handles at this point
 
 

@@ -45,6 +45,8 @@ async def get_user_data(handle, uid, follower=True):
                 None
             )
 
+            certified = True if user_name_wrapper.find('svg', attrs={'data-testid': 'icon-verified'}) else False
+
             bio_elem_wrapper = soup.find(attrs={'data-testid': 'UserDescription'})
             if bio_elem_wrapper:
                 bio_elem = next(
@@ -80,6 +82,7 @@ async def get_user_data(handle, uid, follower=True):
             redirected_url = redirected_url.text if user_url and redirected_url else None
 
             print('Username:', username)
+            print('Certified:', certified)
             if bio_elem_wrapper:
                 print('Bio:', bio)
             print('Joined:', date_joined)
@@ -91,6 +94,7 @@ async def get_user_data(handle, uid, follower=True):
             return XUser(
                 uid,
                 handle, username,
+                certified,
                 bio, date_joined,
                 following_int,
                 followers_int,
@@ -131,29 +135,6 @@ async def get_user_handles():
             user_handles.append(a_elem['href'][1:])
 
     return user_handles
-
-
-# def is_rock_bottom(driver):
-#     return driver.execute_script("""
-#             var scrollable = document.documentElement || document.body;
-#             return (scrollable.scrollHeight - scrollable.scrollTop) <= scrollable.clientHeight;
-#         """)
-
-
-# # function to handle dynamic page content loading - using Selenium
-# def scroll(driver):
-#     driver.execute_script('window.scrollBy(0, document.body.scrollHeight/10);')
-#     new_height = driver.execute_script('return document.body.scrollHeight')
-#     return new_height
-
-
-# def clean_stat(stat):
-#     return stat.replace('0', '') if stat.startswith('0') else stat
-
-
-# def get_stats(stats_grp, stat_pos):
-#     subset = stats_grp[stat_pos].select('span span')
-#     return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
 
 
 @enforce_login
