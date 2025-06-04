@@ -62,10 +62,14 @@ async def get_user_data(handle, uid, follower=True):
             date_joined = datetime.strptime(date_str, '%B %Y')
 
             number_pattern = re.compile(r'\d( (M|k))?')
+
             following_elem = soup.find('a', attrs={'href': f'/{handle}/following'}).find('span', string=number_pattern)
-            following_int = str_to_int(following_elem.text)
+            following_str = following_elem.text
+            following_int = str_to_int(following_str)
+
             followers_elem = soup.find('a', attrs={'href': f'/{handle}/verified_followers'}).find('span', string=number_pattern)
-            followers_int = str_to_int(followers_elem.text)
+            followers_str = followers_elem.text
+            followers_int = str_to_int(followers_str)
 
             # profile_header: only available on profiles that include a location and/or a website
             profile_header = soup.find(attrs={'data-testid': 'UserProfileHeader_Items'})
@@ -90,6 +94,7 @@ async def get_user_data(handle, uid, follower=True):
             print('Following:', following_int)
             if profile_header and user_url:
                 print('User URL:', user_url['href'], redirected_url)
+            print('\n')
 
             return XUser(
                 uid,
@@ -98,6 +103,8 @@ async def get_user_data(handle, uid, follower=True):
                 bio, date_joined,
                 following_int,
                 followers_int,
+                following_str,
+                followers_str,
                 redirected_url,
                 follower
             )

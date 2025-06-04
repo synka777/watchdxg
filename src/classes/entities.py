@@ -9,6 +9,8 @@ class XUser:
             bio: str, created_at: datetime,
             following_count: int,
             followers_count: int,
+            following_str: str,
+            followers_str: str,
             featured_url: str,
             follower: bool
         ):
@@ -20,6 +22,8 @@ class XUser:
             self.created_at = created_at
             self.following_count = following_count
             self.followers_count = followers_count
+            self.following_str = following_str
+            self.followers_str = followers_str
             self.featured_url = featured_url
             self.follower = follower
 
@@ -35,9 +39,11 @@ class XUser:
                 bio, created_at,
                 following_count,
                 followers_count,
+                following_str,
+                followers_str,
                 featured_url,
                 follower
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
         try:
             execute_query(
@@ -50,6 +56,8 @@ class XUser:
                     self.bio, self.created_at,
                     self.following_count,
                     self.followers_count,
+                    self.following_str,
+                    self.followers_str,
                     self.featured_url,
                     self.follower
                 )

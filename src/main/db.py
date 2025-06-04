@@ -318,6 +318,8 @@ def create_users_table():
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         following_count INTEGER,
         followers_count INTEGER,
+        following_str VARCHAR(255),
+        followers_str VARCHAR(255),
         featured_url VARCHAR,
         follower BOOLEAN,
         UNIQUE (handle, created_at)
