@@ -33,16 +33,9 @@ class XUser:
     def insert(self):
         insert_query = """
             INSERT INTO users (
-                account_id,
-                handle, username,
-                certified,
-                bio, created_at,
-                following_count,
-                followers_count,
-                following_str,
-                followers_str,
-                featured_url,
-                follower
+                account_id, handle, username, certified, bio, created_at,
+                following_count, followers_count, following_str, followers_str,
+                featured_url, follower
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
         try:
@@ -50,49 +43,60 @@ class XUser:
                 get_connection(),
                 insert_query,
                 (
-                    self.account_id,
-                    self.handle, self.username,
-                    self.certified,
-                    self.bio, self.created_at,
-                    self.following_count,
-                    self.followers_count,
-                    self.following_str,
-                    self.followers_str,
-                    self.featured_url,
-                    self.follower
+                    self.account_id, self.handle, self.username,
+                    self.certified, self.bio, self.created_at,
+                    self.following_count, self.followers_count,
+                    self.following_str, self.followers_str,
+                    self.featured_url, self.follower
                 )
             )
             return True
         except Exception as e:
-            print('[ERROR] Insertion into database failed', e)
+            print('[ERROR] User insertion into database failed', e)
             # raise
 
 
-class Post:
+class XPost:
     def __init__(self,
-            post_id: str,
+            user_id: int,
             timestamp: datetime,
-            href: str,
-            is_reposted: bool,
-            in_reply_to: list,
-            user_pseudonym: str,
-            user_handle: str,
+            username: str,
+            handle: str,
             text: str,
-            replies: int,
             reposts: int,
             likes: int,
-            views: int
+            replies: int,
+            views: int,
+            repost: bool,
         ):
-        self.post_id = post_id
+        self.user_id = user_id
         self.timestamp = timestamp
-        self.href = href
-        self.is_reposted = is_reposted
-        self.in_reply_to = in_reply_to
-        self.user_pseudonym = user_pseudonym
-        self.user_handle = user_handle
+        self.username = username
+        self.handle = handle
         self.text = text
         self.replies = replies
         self.reposts = reposts
         self.likes = likes
         self.views = views
+        self.repost = repost
 
+    def insert(self):
+        insert_query = """
+            INSERT INTO posts {
+                user_id, timestamp, username, handle, text, reposts, likes, replies, views, repost
+            } VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        try:
+            execute_query(
+                get_connection(),
+                insert_query,
+                (
+                    self.user_id, self.timestamp, self.username, self.handle,
+                    self.text, self.replies, self.reposts, self.likes,
+                    self.views, self.repost
+                )
+            )
+            return True
+        except Exception as e:
+            print('[ERROR] Post insertion into database failed', e)
+            # raise

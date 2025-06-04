@@ -94,7 +94,7 @@ async def get_user_data(handle, uid, follower=True):
             print('Following:', following_int)
             if profile_header and user_url:
                 print('User URL:', user_url['href'], redirected_url)
-            print('\n')
+            print('-----')
 
             return XUser(
                 uid,

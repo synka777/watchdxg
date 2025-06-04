@@ -306,7 +306,7 @@ def create_users_table():
 
     cursor = connection.cursor()
 
-    # SQL to create the table (you can modify the columns as needed)
+    # SQL to create the table
     create_table_query = """
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -323,6 +323,51 @@ def create_users_table():
         featured_url VARCHAR,
         follower BOOLEAN,
         UNIQUE (handle, created_at)
+    );
+    """
+
+    try:
+        cursor.execute(create_table_query)
+        connection.commit()
+        print('Users table created successfully.')
+    except Exception as e:
+        success = False
+        print(f'Error: Could not create table: {e}')
+    finally:
+        cursor.close()
+        connection.close()
+        return success
+
+
+# Create table to store each user's posts
+def create_posts_table():
+    """
+    Creates a table to store posts in the database.
+    """
+    connection = get_connection()
+    success = True
+
+    if connection is None:
+        print('Could not establish connection to database. Exiting...')
+        return
+
+    cursor = connection.cursor()
+
+    # SQL to create the table (you can modify the columns as needed)
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        timestamp TIMESTAMPTZ,
+        username VARCHAR(255),
+        handle VARCHAR(255),
+        text VARCHAR(255),
+        reposts INTEGER,
+        likes INTEGER,
+        replies INTEGER,
+        views INTEGER,
+        repost BOOLEAN,
+        UNIQUE (user_id, timestamp)
     );
     """
 
@@ -380,6 +425,9 @@ def setup_db():
         return False
     if not create_users_table():
         print('[ERROR] Failed to create users table.')
+        return False
+    if not create_posts_table():
+        print('[ERROR] Failed to create posts table.')
         return False
 
     return True
