@@ -1,6 +1,7 @@
 from main.db import execute_query, get_connection
 from datetime import datetime
 
+
 class XUser:
     def __init__(self,
             account_id: int,
@@ -26,6 +27,13 @@ class XUser:
             self.followers_str = followers_str
             self.featured_url = featured_url
             self.follower = follower
+            self.articles = []
+
+    def add_article(self, article_html):
+        self.articles.append(article_html)
+
+    def get_articles(self):
+        return self.articles
 
     def dataset_fill_up():
         pass
@@ -36,10 +44,10 @@ class XUser:
                 account_id, handle, username, certified, bio, created_at,
                 following_count, followers_count, following_str, followers_str,
                 featured_url, follower
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """
         try:
-            execute_query(
+            res = execute_query(
                 get_connection(),
                 insert_query,
                 (
@@ -48,9 +56,10 @@ class XUser:
                     self.following_count, self.followers_count,
                     self.following_str, self.followers_str,
                     self.featured_url, self.follower
-                )
+                ),
+                fetchone = True
             )
-            return True
+            return res[0]
         except Exception as e:
             print('[ERROR] User insertion into database failed', e)
             # raise
@@ -58,6 +67,7 @@ class XUser:
 
 class XPost:
     def __init__(self,
+            id: int,
             user_id: int,
             timestamp: datetime,
             username: str,
@@ -69,6 +79,7 @@ class XPost:
             views: int,
             repost: bool,
         ):
+        self.id = id,
         self.user_id = user_id
         self.timestamp = timestamp
         self.username = username
@@ -82,21 +93,20 @@ class XPost:
 
     def insert(self):
         insert_query = """
-            INSERT INTO posts {
-                user_id, timestamp, username, handle, text, reposts, likes, replies, views, repost
-            } VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO posts (
+                id, user_id, timestamp, username, handle, text, reposts, likes, replies, views, repost
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         try:
             execute_query(
                 get_connection(),
                 insert_query,
                 (
-                    self.user_id, self.timestamp, self.username, self.handle,
-                    self.text, self.replies, self.reposts, self.likes,
-                    self.views, self.repost
+                    self.id, self.user_id, self.timestamp, self.username,
+                    self.handle, self.text, self.replies, self.reposts,
+                    self.likes, self.views, self.repost
                 )
             )
-            return True
         except Exception as e:
             print('[ERROR] Post insertion into database failed', e)
             # raise

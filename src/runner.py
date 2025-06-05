@@ -3,8 +3,8 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 """
 
+from main.scraper import get_user_handles, get_user_data, get_post_instance
 from main.infra import enforce_login, AsyncBrowserManager
-from main.scraper import get_user_handles, get_user_data
 from tools.utils import parse_args, filter_known
 from main.db import setup_db, register_get_uid
 from config import get_settings, env
@@ -23,7 +23,6 @@ async def main(uid):
     # Then process the soup to get the user handle of each follower
     await page.goto(followers_url)
     user_handles = await get_user_handles()
-    # user_handles = [get_user_handles()[0]]
 
     user_handles = filter_known(user_handles)
 
@@ -32,7 +31,11 @@ async def main(uid):
         followers = await asyncio.gather(*tasks, return_exceptions=True)
 
         for follower in followers:
-            follower.insert()
+            user_id = follower.insert()
+            # Then, get Post data from each HTML Element
+            for article in follower.get_articles():
+                xpost = get_post_instance(article, user_id)
+                xpost.insert()
     else:
         print('[OK] No new users found')
 

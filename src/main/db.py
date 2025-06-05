@@ -356,12 +356,12 @@ def create_posts_table():
     # SQL to create the table (you can modify the columns as needed)
     create_table_query = """
     CREATE TABLE IF NOT EXISTS posts (
-        id SERIAL PRIMARY KEY,
+        id BIGINT PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         timestamp TIMESTAMPTZ,
         username VARCHAR(255),
         handle VARCHAR(255),
-        text VARCHAR(255),
+        text TEXT,
         reposts INTEGER,
         likes INTEGER,
         replies INTEGER,
@@ -374,7 +374,7 @@ def create_posts_table():
     try:
         cursor.execute(create_table_query)
         connection.commit()
-        print('Users table created successfully.')
+        print('Posts table created successfully.')
     except Exception as e:
         success = False
         print(f'Error: Could not create table: {e}')

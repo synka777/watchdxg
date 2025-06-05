@@ -5,6 +5,13 @@ import re
 settings = {}
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Script with optional --setup flag")
+    parser.add_argument('--setup', action='store_true', help='Run with database setup operations')
+    parser.add_argument('--head', action='store_true', help='Run firefox in headed mode (visible)')
+    return parser.parse_args()
+
+
 def filter_known(handles: list[str]):
     filtered = []
     for handle in handles:
@@ -20,13 +27,6 @@ def filter_known(handles: list[str]):
         else:
             filtered.append(handle)
     return filtered # filtered == handles at this point
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Script with optional --setup flag")
-    parser.add_argument('--setup', action='store_true', help='Run with database setup operations')
-    parser.add_argument('--head', action='store_true', help='Run firefox in headed mode (visible)')
-    return parser.parse_args()
 
 
 def str_to_int(str):
@@ -47,3 +47,11 @@ def str_to_int(str):
 
     return int(float(str) * multiplier)
 
+
+def get_stats(stats_grp, stat_pos):
+    subset = stats_grp[stat_pos].select('span span')
+    return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
+
+
+def clean_stat(stat):
+    return stat.replace('0', '') if stat.startswith('0') else stat
