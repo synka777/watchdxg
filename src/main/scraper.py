@@ -15,31 +15,26 @@ MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 
 
-def get_post_instance(post_elem, user_id):
+def get_post_instance(post_elem, user_id, user_handle):
     """Get all data from a given a post
-    Trigger from runner.py
+    Triggered from runner.py
     Args:
         post_elem <article> tag and its content
         user_id: The user ID that post is attached to
+        user_handle: The current user's handle
     """
 
-    # Is it a repost?
-    # reposted = True if bool(post_elem.select('span', {'data-testid': 'socialContext'})) else False
-    reposted = False
-    if bool(post_elem.select('span[data-testid="socialContext"]')):
-        reposted = True
+    #######################################
+    # Step 1: Get handle and repost status
+
+    reposted = True if bool(post_elem.select('span[data-testid="socialContext"]')) else False
+
     # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, in its two children
     posted_by_at_grp = post_elem.find('div', {'data-testid': 'User-Name'})
     pbag_children = posted_by_at_grp.find_all('div', recursive=False)
 
-    username_wrapper = pbag_children[0]
     userhandle_dt_wrapper = pbag_children[1]
 
-    username_elem = next( # Search for the next span with text
-        (span for span in username_wrapper.find_all('span')
-        if span.get_text(strip=True) and not span.find('span')),
-        None
-    )
     handle_elem = next( # Search for the next span with text
         (span for span in userhandle_dt_wrapper.find_all('span')
         if span.get_text(strip=True) and not span.find('span')),
@@ -47,7 +42,25 @@ def get_post_instance(post_elem, user_id):
     )
 
     # If the username is only composed of emojis (=None), use handle as username instead
-    handle = handle_elem.get_text()
+    handle = handle_elem.get_text()[1:]
+
+    # Now that we know the handle of the current post,
+    # if it's not from the currently evaluated user AND it's not reposed by it neither, return None
+    if not reposted:
+        if not handle == user_handle:
+            return
+
+    ###################################
+    # Step 2: Get the rest of the data
+
+    # If the current post is relevant, process the rest of the data
+    username_wrapper = pbag_children[0]
+    username_elem = next( # Search for the next span with text
+        (span for span in username_wrapper.find_all('span')
+        if span.get_text(strip=True) and not span.find('span')),
+        None
+    )
+
     username = handle[1:] if not username_elem else username_elem.get_text()
     timestamp = userhandle_dt_wrapper.find('time')['datetime']
 
@@ -90,6 +103,9 @@ def get_post_instance(post_elem, user_id):
     print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
     print(f'Reposted: {reposted}')
     print('-----')
+
+    ###############################
+    # Step 3: Return post instance
 
     return XPost(
         post_id, user_id, timestamp, username, handle, tweet_text,
@@ -222,7 +238,6 @@ async def get_user_handles():
     for follower in followers:
         a_elem = follower.find('a', {'role':'link', 'aria-hidden': 'true'})
         if a_elem.has_attr('href'):
-            print('Follower:', a_elem['href'][1:])
             user_handles.append(a_elem['href'][1:])
 
     return user_handles
