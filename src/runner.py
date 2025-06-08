@@ -32,10 +32,11 @@ async def main(uid):
 
         for follower in followers:
             user_id = follower.insert()
-            # Then, get Post data from each HTML Element
+            # # Then, get Post data from each HTML Element
             for article in follower.get_articles():
                 xpost = get_post_instance(article, user_id)
                 xpost.insert()
+            pass
     else:
         print('[OK] No new users found')
 

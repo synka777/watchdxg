@@ -15,35 +15,60 @@ MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 
 
-def get_post_instance(post_element, user_id):
+def get_post_instance(post_elem, user_id):
     """Get all data from a given a post
     Trigger from runner.py
     Args:
-        post_element <article> tag and its content
+        post_elem <article> tag and its content
         user_id: The user ID that post is attached to
     """
 
     # Is it a repost?
-    is_reposted = True if bool(
-    post_element.select('span', {'data-testid': 'socialContext'})[0].select('span span span')) else False
+    # reposted = True if bool(post_elem.select('span', {'data-testid': 'socialContext'})) else False
+    reposted = False
+    if bool(post_elem.select('span[data-testid="socialContext"]')):
+        reposted = True
+    # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, in its two children
+    posted_by_at_grp = post_elem.find('div', {'data-testid': 'User-Name'})
+    pbag_children = posted_by_at_grp.find_all('div', recursive=False)
 
-    # posted_by_at_grp is a bunch of nested elements that stores the username, handle, datetime, etc
-    posted_by_at_grp = post_element.select('div', {'data-testid': 'User-Name'})[0]
-    display_name = posted_by_at_grp.select('a > div > div > span > span')[0].text # TODO: IMPROVE THIS
-    user_handle = posted_by_at_grp.select('div > div > div > a > div > span')[0].text # TODO: IMPROVE THIS
-    timestamp = posted_by_at_grp.select('time')[0]['datetime']
-    href = posted_by_at_grp.select('div div div a')[-1]['href'].replace('/analytics', '') # TODO: IMPROVE THIS
-    post_id = href.split('/')[-1]
+    username_wrapper = pbag_children[0]
+    userhandle_dt_wrapper = pbag_children[1]
+
+    username_elem = next( # Search for the next span with text
+        (span for span in username_wrapper.find_all('span')
+        if span.get_text(strip=True) and not span.find('span')),
+        None
+    )
+    handle_elem = next( # Search for the next span with text
+        (span for span in userhandle_dt_wrapper.find_all('span')
+        if span.get_text(strip=True) and not span.find('span')),
+        None
+    )
+
+    # If the username is only composed of emojis (=None), use handle as username instead
+    handle = handle_elem.get_text()
+    username = handle[1:] if not username_elem else username_elem.get_text()
+    timestamp = userhandle_dt_wrapper.find('time')['datetime']
+
+
+    href_elem = None
+    for a in userhandle_dt_wrapper.find_all('a'):
+        if a['href'] and 'status/' in a['href']:
+            if not a.find('a'):
+                href_elem = a
+
+    post_id = href_elem['href'].split('/')[-1]
 
     # stats_grp is a web element group composing the social interaction statistics
-    stats_grp = post_element.select('span[data-testid="app-text-transition-container"]')
+    stats_grp = post_elem.select('span[data-testid="app-text-transition-container"]')
     replies = get_stats(stats_grp, 0)
     reposts = get_stats(stats_grp, 1)
     likes = get_stats(stats_grp, 2)
     views = get_stats(stats_grp, 3) if len(stats_grp) > 3 else str(0)
 
     # For some reason, tweet_text includes unwanted strings, remove it
-    trim_head_str = f'{display_name}{user_handle}·{posted_by_at_grp.select("time")[0].text}'
+    trim_head_str = f'{username}{handle}·{posted_by_at_grp.select("time")[0].text}'
     trim_tail_str = clean_stat(replies) + clean_stat(reposts) + clean_stat(likes) + clean_stat(views)
 
     # Prepare stats for the upcoming DB storage
@@ -52,23 +77,23 @@ def get_post_instance(post_element, user_id):
     likes = str_to_int(likes)
     views = str_to_int(views)
 
-    tweet_text = post_element.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
+    tweet_text = post_elem.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
 
     if tweet_text.endswith(trim_tail_str):
         tweet_text = tweet_text[: -len(trim_tail_str)]
 
     print(f'Post_id: {post_id}')
-    print(f'DisplayName: {display_name}')
+    print(f'Username: {username}')
     print(f'TimeStamp: {timestamp}')
-    print(f'Handle: {user_handle}')
+    print(f'Handle: {handle}')
     print(f'Text: {tweet_text}')
     print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
-    print(f'Reposted: {is_reposted}')
+    print(f'Reposted: {reposted}')
     print('-----')
 
     return XPost(
-        post_id, user_id, timestamp, display_name, user_handle, tweet_text,
-        replies, reposts, likes, views, is_reposted
+        post_id, user_id, timestamp, username, handle, tweet_text,
+        replies, reposts, likes, views, reposted
     )
 
 
