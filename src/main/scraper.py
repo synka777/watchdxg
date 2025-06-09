@@ -14,8 +14,8 @@ locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
 MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 
-
-def get_post_instance(post_elem, user_id, user_handle):
+@apply_concurrency_limit(semaphore)
+async def get_post_instance(post_elem, user_id, user_handle):
     """Get all data from a given a post
     Triggered from runner.py
     Args:
