@@ -1,3 +1,4 @@
+from pathlib import Path
 from psycopg2 import sql, errors, Error
 from config import settings, env
 import subprocess
@@ -55,8 +56,10 @@ def execute_query(connection, query, params=None, fetch=False, fetchone=False):
 
             if fetch:
                 return cur.fetchall()
-            if fetchone:
+            elif fetchone:
                 return cur.fetchone()
+            else:
+                return True
     except errors.UniqueViolation as uve:
         print(f'[INFO] Skipped duplicate: {uve}')
         connection.rollback()
@@ -259,131 +262,6 @@ def grant_privileges():
         return success
 
 
-# Function to create the X account's table
-def create_account_table():
-    """
-    Creates a table to store X accounts that need to be managed
-    """
-    connection = get_connection()
-    success = True
-
-    if connection is None:
-        print('Could not establish connection to database. Exiting...')
-        return
-
-    cursor = connection.cursor()
-
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS accounts (
-        id SERIAL PRIMARY KEY,
-        handle VARCHAR(255),
-        UNIQUE (handle)
-    );
-    """
-
-    try:
-        cursor.execute(create_table_query)
-        print('Accounts table created successfully.')
-    except Exception as e:
-        success = False
-        print(f'Error: Could not create table: {e}')
-    finally:
-        cursor.close()
-        connection.close()
-        return success
-
-# Function to create the table to store user data
-def create_users_table():
-    """
-    Creates a table for storing user data in the database.
-    """
-    connection = get_connection()
-    success = True
-
-    if connection is None:
-        print('Could not establish connection to database. Exiting...')
-        return
-
-    cursor = connection.cursor()
-
-    # SQL to create the table
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
-        handle VARCHAR(255),
-        username VARCHAR(255),
-        certified BOOLEAN,
-        bio TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        following_count INTEGER,
-        followers_count INTEGER,
-        following_str VARCHAR(255),
-        followers_str VARCHAR(255),
-        featured_url VARCHAR,
-        follower BOOLEAN,
-        UNIQUE (handle, created_at)
-    );
-    """
-
-    try:
-        cursor.execute(create_table_query)
-        connection.commit()
-        print('Users table created successfully.')
-    except Exception as e:
-        success = False
-        print(f'Error: Could not create table: {e}')
-    finally:
-        cursor.close()
-        connection.close()
-        return success
-
-
-# Create table to store each user's posts
-def create_posts_table():
-    """
-    Creates a table to store posts in the database.
-    """
-    connection = get_connection()
-    success = True
-
-    if connection is None:
-        print('Could not establish connection to database. Exiting...')
-        return
-
-    cursor = connection.cursor()
-
-    # SQL to create the table (you can modify the columns as needed)
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS posts (
-        id BIGINT PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        timestamp TIMESTAMPTZ,
-        username VARCHAR(255),
-        handle VARCHAR(255),
-        text TEXT,
-        reposts INTEGER,
-        likes INTEGER,
-        replies INTEGER,
-        views INTEGER,
-        repost BOOLEAN,
-        UNIQUE (user_id, timestamp)
-    );
-    """
-
-    try:
-        cursor.execute(create_table_query)
-        connection.commit()
-        print('Posts table created successfully.')
-    except Exception as e:
-        success = False
-        print(f'Error: Could not create table: {e}')
-    finally:
-        cursor.close()
-        connection.close()
-        return success
-
-
 def register_get_uid():
     add_acc_query = 'INSERT INTO accounts (handle) VALUES (%s) RETURNING id'
     res = execute_query(
@@ -409,25 +287,59 @@ def register_get_uid():
     return uid
 
 
-# if __name__ == '__main__':
 def setup_db():
+
+    #################
+    # Setup database
+
     if not create_database():
         print('[ERROR] Failed to create database.')
         return False
+
     if not create_db_user():
         print('[ERROR] Failed to create DB user.')
         return False
+
     if not grant_privileges():
         print('[ERROR] Failed to grant privileges.')
         return False
-    if not create_account_table():
-        print('[ERROR] Failed to create account table.')
-        return False
-    if not create_users_table():
-        print('[ERROR] Failed to create users table.')
-        return False
-    if not create_posts_table():
-        print('[ERROR] Failed to create posts table.')
-        return False
+
+    ################
+    # Create tables
+
+    src_dir = Path(__file__).resolve().parent.parent
+    connection = get_connection()
+
+    with open(f'{src_dir}/sql/accounts.sql', 'r') as f:
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            print('[ERROR] Failed to create accounts table.')
+            return False
+
+    with open(f'{src_dir}/sql/users.sql', 'r') as f:
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            print('[ERROR] Failed to create users table.')
+            return False
+
+    with open(f'{src_dir}/sql/posts.sql', 'r') as f:
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            print('[ERROR] Failed to create posts table.')
+            return False
+
+    with open(f'{src_dir}/sql/classification.sql', 'r') as f:
+        print('classification')
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            print('[ERROR] Failed to create classification table.')
+            return False
+
+    with open(f'{src_dir}/sql/actions.sql', 'r') as f:
+        print('actions')
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            print('[ERROR] Failed to create actions table.')
+            return False
 
     return True
