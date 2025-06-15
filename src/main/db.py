@@ -329,14 +329,12 @@ def setup_db():
             return False
 
     with open(f'{src_dir}/sql/classification.sql', 'r') as f:
-        print('classification')
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
             print('[ERROR] Failed to create classification table.')
             return False
 
     with open(f'{src_dir}/sql/actions.sql', 'r') as f:
-        print('actions')
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
             print('[ERROR] Failed to create actions table.')

@@ -1,4 +1,4 @@
-CREATE TABLE actions (
+CREATE TABLE IF NOT EXISTS actions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     action_type VARCHAR(50),

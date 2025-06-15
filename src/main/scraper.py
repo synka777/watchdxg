@@ -4,13 +4,10 @@ from tools.utils import str_to_int, get_stats, clean_stat
 from classes.entities import XUser, XPost
 from config import settings, env
 from bs4 import BeautifulSoup
-from datetime import datetime
+from dateutil import parser
 import asyncio
-import locale
 import re
 
-
-locale.setlocale(locale.LC_TIME, env.str('LOCALE'))
 MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
 
@@ -151,7 +148,7 @@ async def get_user_data(handle, uid, follower=True):
             joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
             date_str_list = joined_elem.text.strip().split(' ')[-2:]
             date_str = ' '.join(date_str_list)
-            date_joined = datetime.strptime(date_str, '%B %Y')
+            date_joined = parser.parse(date_str) # Use datutil parser instead of datetime.strptime, works for any locale
 
             number_pattern = re.compile(r'\d( (M|k))?')
 

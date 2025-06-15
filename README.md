@@ -47,7 +47,6 @@ Actions will then be taken accordingly (signal and block said account).
    PASSWORD=your_x_password
    CONTACTINFO=your_contact_info <= (Probably a phone number)
    FFPROFILEPATH=your_firefox_profile_path
-   LOCALE=the_locale_used_by_your_browser
    ```
 
    locale example: fr_FR.UTF-8

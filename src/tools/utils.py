@@ -39,6 +39,9 @@ def str_to_int(str):
     if 'k' in str:
         multiplier = 1000
         str = str.replace('k', '')
+    if 'K' in str:
+        multiplier = 1000
+        str = str.replace('K', '')
     if 'M' in str:
         multiplier = 1000000
         str = str.replace('M', '')
