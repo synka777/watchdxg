@@ -3,7 +3,7 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 """
 
-from main.scraper import get_user_handles, get_user_data, get_post_instance
+from main.scraper import get_user_handles, extract, transform
 from main.infra import enforce_login, AsyncBrowserManager
 from tools.utils import parse_args, filter_known
 from main.db import setup_db, register_get_uid
@@ -22,30 +22,22 @@ async def main(uid):
 
     # Then process the soup to get the user handle of each follower
     await page.goto(followers_url)
-    user_handles = await get_user_handles()
 
+    # Extract
+    user_handles = await get_user_handles()
     user_handles = filter_known(user_handles)
 
     if user_handles:
-        tasks = [get_user_data(handle, uid) for handle in user_handles]
-        followers = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [extract(handle) for handle in user_handles]
+        followers_data = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for follower in followers:
-            user_id = follower.insert()
+        for user_extract in followers_data:
+            # Transform
+            xuser = transform(user_extract, uid)
 
-            # Then, get Post data from each HTML Element
-            tasks = [
-                get_post_instance(
-                    article,
-                    user_id,
-                    follower.handle
-                ) for article in follower.get_articles()
-            ]
-
-            xposts = await asyncio.gather(*tasks, return_exceptions=True)
-            for xpost in xposts:
-                if xpost:
-                    xpost.insert()
+            # Load
+            # Triggers user insertion AND the insertion of its associated posts
+            xuser.insert()
 
     else:
         print('[OK] No new users found')
