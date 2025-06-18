@@ -63,7 +63,6 @@ class XUser:
     articles: List[XPost] = field(default_factory=list)
 
     def add_article(self, article_html):
-        print('Adding article to XUser')
         self.articles.append(article_html)
 
     def insert(self):
@@ -96,5 +95,3 @@ class XUser:
             for post in self.articles:
                 post.user_id = xuser_id
                 post.insert()
-        else:
-            print('No articles!')

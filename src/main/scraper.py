@@ -1,3 +1,4 @@
+import random
 from main.infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from tools.utils import str_to_int, get_stats, clean_stat
@@ -42,11 +43,19 @@ def get_post_instance(post_elem, user_handle):
     # If the username is only composed of emojis (=None), use handle as username instead
     handle = handle_elem.get_text()[1:]
 
+    href_elem = None
+    for a in userhandle_dt_wrapper.find_all('a'):
+        if a['href'] and 'status/' in a['href']:
+            if not a.find('a'):
+                href_elem = a
+
+    post_id = href_elem['href'].split('/')[-1]
+
     # Now that we know the handle of the current post,
     # if it's not from the currently evaluated user AND it's not reposed by it neither, return None
     if not reposted:
         if not handle == user_handle:
-            print('[INFO]: Post discarded')
+            print(f'[INFO] {post_id} - Discarded: Displayed for context')
             return
 
     ###################################
@@ -61,16 +70,7 @@ def get_post_instance(post_elem, user_handle):
     )
 
     username = handle[1:] if not username_elem else username_elem.get_text()
-    timestamp = userhandle_dt_wrapper.find('time')['datetime']
-
-
-    href_elem = None
-    for a in userhandle_dt_wrapper.find_all('a'):
-        if a['href'] and 'status/' in a['href']:
-            if not a.find('a'):
-                href_elem = a
-
-    post_id = href_elem['href'].split('/')[-1]
+    timestamp = userhandle_dt_wrapper.find('time')['datetime'][:-5]
 
     # stats_grp is a web element group composing the social interaction statistics
     stats_grp = post_elem.select('span[data-testid="app-text-transition-container"]')
@@ -79,36 +79,29 @@ def get_post_instance(post_elem, user_handle):
     likes = get_stats(stats_grp, 2)
     views = get_stats(stats_grp, 3) if len(stats_grp) > 3 else str(0)
 
-    # For some reason, tweet_text includes unwanted strings, remove it
-    trim_head_str = f'{username}{handle}·{posted_by_at_grp.select("time")[0].text}'
-    trim_tail_str = clean_stat(replies) + clean_stat(reposts) + clean_stat(likes) + clean_stat(views)
-
     # Prepare stats for the upcoming DB storage
     replies = str_to_int(replies)
     reposts = str_to_int(likes)
     likes = str_to_int(likes)
     views = str_to_int(views)
 
-    tweet_text = post_elem.select('div', {'data-testid': 'tweetText'})[0].text.replace(trim_head_str, '')
+    tweet_text_elem = post_elem.find('div', {'data-testid': 'tweetText'})
+    tweet_text = tweet_text_elem.select('span') if tweet_text_elem else None
+    cleaned_text = tweet_text[0].text if tweet_text else None
 
-    if tweet_text.endswith(trim_tail_str):
-        tweet_text = tweet_text[: -len(trim_tail_str)]
-
-    print('-----')
-    print(f'Post_id: {post_id}')
-    print(f'Username: {username}')
-    print(f'TimeStamp: {timestamp}')
-    print(f'Handle: {handle}')
-    print(f'Text: {tweet_text}')
-    print('Replies: ', replies, 'Reposts: ', reposts, 'Likes: ', likes, 'Views: ', views)
-    print(f'Reposted: {reposted}')
-
+    print(
+        '[INFO]', post_id,
+        '- Timestamp:', timestamp,
+        f'- Text: {"True" if cleaned_text else "False"}',
+        '- Reposted:', reposted,
+        '- Handle:', handle,
+    )
 
     ###############################
     # Step 3: Return post instance
 
     return XPost(
-        post_id, timestamp, username, handle, tweet_text,
+        post_id, timestamp, username, handle, cleaned_text,
         replies, reposts, likes, views, reposted
     )
 
@@ -188,33 +181,16 @@ def transform(user_extract: UserExtract, uid, follower=True):
             follower
         )
 
-        print('XUser instance:', xuser)
-        print('Type of xuser:', type(xuser))
-        print('XUser dict:', xuser.__dict__)
-        articles = feed_region.findAll('article', {'data-testid': 'tweet'})
-        print('LEN', len(articles))
-        for article in articles:
-            try:
-                xpost = get_post_instance(article, user_extract.handle)
-                print('[DEBUG] xpost =', xpost)
-                if xpost:
-                    print('[DEBUG] About to call add_article()')
-                    print('add_article method:', xuser.add_article)
-                    xuser.add_article(xpost)
-            except Exception as e:
-                print('[ERROR] Article loop failed:', e)
-
-
-        print('Username:', username)
-        print('Certified:', certified)
-        if bio_elem_wrapper:
-            print('Bio:', bio)
-        print('Joined:', date_joined)
-        print('Followers:', followers_int)
-        print('Following:', following_int)
-        if profile_header and user_url:
-            print('User URL:', user_url['href'], redirected_url)
         print('-----')
+        print('[INFO] User: handle: {user_extract.handle} - Joined: {date_joined} - Certified: {certified} - Followers: {followers_int} - Following: {following_int}')
+
+        articles = feed_region.findAll('article', {'data-testid': 'tweet'})
+        if articles:
+            print(f'[INFO] Posts processing: {len(articles)} posts found')
+            for article in articles:
+                xpost = get_post_instance(article, user_extract.handle)
+                if xpost:
+                    xuser.add_article(xpost)
 
         return xuser
 
@@ -235,7 +211,7 @@ async def extract(handle):
 
             # Wait for one of the last elements of the page to load and THEN get the DOM
             await page.wait_for_selector('section[role="region"]')
-            await asyncio.sleep(5)
+            await asyncio.sleep(random.uniform(5, 6))
             html = await page.content()
 
             return UserExtract(handle, html)

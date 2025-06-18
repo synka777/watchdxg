@@ -7,7 +7,7 @@ from main.scraper import get_user_handles, extract, transform
 from main.infra import enforce_login, AsyncBrowserManager
 from tools.utils import parse_args, filter_known
 from main.db import setup_db, register_get_uid
-from config import get_settings, env
+from config import env
 import asyncio
 
 
@@ -46,7 +46,6 @@ async def main(uid):
 
 
 async def start():
-    get_settings() # Makes the app settings available during runtime
     args = parse_args()
 
     if args.setup:
