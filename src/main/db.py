@@ -49,7 +49,7 @@ def pgsql_installed_by_brew(result):
     return False
 
 
-def execute_query(connection, query, params=None, fetch=False, fetchone=False):
+def execute_query(connection, query, params=None, fetch=False, fetchone=False, do_raise=False):
     try:
         with connection.cursor() as cur:
             cur.execute(query, params)
@@ -61,8 +61,9 @@ def execute_query(connection, query, params=None, fetch=False, fetchone=False):
             else:
                 return True
     except errors.UniqueViolation as uve:
-        print(f'[INFO] Skipped duplicate: {uve}')
         connection.rollback()
+        if do_raise:
+            raise
         return True
     except Error as e:
         print(f'[ERROR] Database error: {e}')

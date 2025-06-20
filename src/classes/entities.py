@@ -1,7 +1,8 @@
 from main.db import execute_query, get_connection
+from psycopg2.errors import UniqueViolation
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Optional, List
+from datetime import datetime
 
 
 # Used to pass information from Extract to Transform
@@ -39,11 +40,16 @@ class XPost:
                     self.id, self.user_id, self.timestamp, self.username,
                     self.handle, self.text, self.replies, self.reposts,
                     self.likes, self.views, self.repost
-                )
+                ),
+                do_raise = True
             )
+
+        except UniqueViolation:
+            print(f'[INFO] Post {self.id} already in DB - Stopping post insertions for user ID {self.user_id}')
+            raise # re-raises the same exception to the caller
+
         except Exception as e:
             print('[ERROR] Post insertion into database failed', e)
-            # raise
 
 
 @dataclass
@@ -61,22 +67,34 @@ class XUser:
     featured_url: str
     follower: bool
     articles: List[XPost] = field(default_factory=list)
+    id: Optional[int] = None # Declared as optional to be passed around the class
 
     def add_article(self, article_html):
         self.articles.append(article_html)
 
-    def insert(self):
-        insert_query = """
-            INSERT INTO users (
+    def upsert(self):
+        upsert_query = """
+            insert INTO users (
                 account_id, handle, username, certified, bio, created_at,
                 following_count, followers_count, following_str, followers_str,
                 featured_url, follower
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (handle, created_at) DO UPDATE SET
+                username = EXCLUDED.username,
+                certified = EXCLUDED.certified,
+                bio = EXCLUDED.bio,
+                following_count = EXCLUDED.following_count,
+                followers_count = EXCLUDED.followers_count,
+                following_str = EXCLUDED.following_str,
+                followers_str = EXCLUDED.followers_str,
+                featured_url = EXCLUDED.featured_url,
+                follower = EXCLUDED.follower
+            RETURNING id;
             """
         try:
             res = execute_query(
                 get_connection(),
-                insert_query,
+                upsert_query,
                 (
                     self.account_id, self.handle, self.username,
                     self.certified, self.bio, self.created_at,
@@ -86,12 +104,16 @@ class XUser:
                 ),
                 fetchone = True
             )
-            xuser_id = res[0]
+            self.id = res[0]
 
         except Exception as e:
-            print('[ERROR] User insertion into database failed', e)
-            # raise
+            print('[ERROR] User upsertion into database failed', e)
+            return
+
         if self.articles:
             for post in self.articles:
-                post.user_id = xuser_id
-                post.insert()
+                try:
+                    post.user_id = self.id
+                    post.insert()
+                except UniqueViolation:
+                    break

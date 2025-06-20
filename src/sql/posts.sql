@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS posts (
     replies INTEGER,
     views INTEGER,
     repost BOOLEAN,
-    UNIQUE (user_id, timestamp)
+    UNIQUE (id, repost)
 );

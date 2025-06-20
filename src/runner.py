@@ -5,14 +5,14 @@ All Rights Reserved.
 
 from main.scraper import get_user_handles, extract, transform
 from main.infra import enforce_login, AsyncBrowserManager
-from tools.utils import parse_args, filter_known
+from tools.utils import filter_known
 from main.db import setup_db, register_get_uid
-from config import env
+from config import env, parse_args
 import asyncio
 
 
 @enforce_login
-async def main(uid):
+async def main(uid, noupdate):
     # Initialize main variables
     user_handles: list[str] = []
 
@@ -25,7 +25,8 @@ async def main(uid):
 
     # Extract
     user_handles = await get_user_handles()
-    user_handles = filter_known(user_handles)
+    if noupdate:
+        user_handles = filter_known(user_handles)
 
     if user_handles:
         tasks = [extract(handle) for handle in user_handles]
@@ -37,7 +38,7 @@ async def main(uid):
 
             # Load
             # Triggers user insertion AND the insertion of its associated posts
-            xuser.insert()
+            xuser.upsert()
 
     else:
         print('[OK] No new users found')
@@ -56,11 +57,14 @@ async def start():
     if args.head:
         AsyncBrowserManager.disable_headless()
 
+    noupdate = True if args.noupdate else False
+
+
     uid = register_get_uid()
     if not uid:
         print('[ERROR] Unable to get account id')
         return
-    await main(uid)
+    await main(uid, noupdate)
 
 
 if __name__ == '__main__':

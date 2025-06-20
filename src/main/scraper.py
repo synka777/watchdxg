@@ -182,7 +182,7 @@ def transform(user_extract: UserExtract, uid, follower=True):
         )
 
         print('-----')
-        print('[INFO] User: handle: {user_extract.handle} - Joined: {date_joined} - Certified: {certified} - Followers: {followers_int} - Following: {following_int}')
+        print(f'[INFO] User: handle: {user_extract.handle} - Joined: {date_joined} - Certified: {certified} - Followers: {followers_int} - Following: {following_int}')
 
         articles = feed_region.findAll('article', {'data-testid': 'tweet'})
         if articles:
