@@ -1,4 +1,4 @@
-from tools.utils import str_to_int
+from src.tools.utils import str_to_int
 from bs4 import BeautifulSoup
 from datetime import datetime
 from environs import Env

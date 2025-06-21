@@ -8,6 +8,7 @@ from main.infra import enforce_login, AsyncBrowserManager
 from tools.utils import filter_known
 from main.db import setup_db, register_get_uid
 from config import env, parse_args
+from tools.logger import logger
 import asyncio
 
 
@@ -41,7 +42,7 @@ async def main(uid, noupdate):
             xuser.upsert()
 
     else:
-        print('[OK] No new users found')
+        logger.info('[OK] No new users found')
 
     await AsyncBrowserManager.close()
 
@@ -50,7 +51,7 @@ async def start():
     args = parse_args()
 
     if args.setup:
-        print('[INFO] Running with setup flag')
+        logger.info('Running with setup flag')
         if not setup_db():
             return
 
@@ -62,7 +63,7 @@ async def start():
 
     uid = register_get_uid()
     if not uid:
-        print('[ERROR] Unable to get account id')
+        logger.error('Unable to get account id')
         return
     await main(uid, noupdate)
 

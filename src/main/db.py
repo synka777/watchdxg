@@ -1,6 +1,7 @@
 from pathlib import Path
 from psycopg2 import sql, errors, Error
 from config import settings, env
+from tools.logger import logger
 import subprocess
 import platform
 import psycopg2
@@ -20,7 +21,7 @@ def start_pgsql_w_brew():
         raise RuntimeError(f"Command failed: {brew_start.stderr}")
 
     if 'Successfully started' in brew_start.stdout:
-        print('[INFO] Successfully started postgresql brew service')
+        logger.info('Successfully started postgresql brew service')
         return True
     else:
         return False
@@ -33,7 +34,7 @@ def brew_pgsql_started(result):
         raise RuntimeError(f"Command failed: {result.stderr}")
 
     if brew_pgsql_started_pttrn.search(result.stdout):
-        print('[INFO] pgsql service already running')
+        logger.info('pgsql service already running')
         return True
     return False
 
@@ -66,7 +67,7 @@ def execute_query(connection, query, params=None, fetch=False, fetchone=False, d
             raise
         return True
     except Error as e:
-        print(f'[ERROR] Database error: {e}')
+        logger.error(f'Database error: {e}')
         connection.rollback()
         return None
 
@@ -93,9 +94,9 @@ def get_default_connection(init=False):
             if not brew_pgsql_started(brew_services):
                 if pgsql_installed_by_brew(brew_services):
                     if start_pgsql_w_brew():
-                        print('[INFO] PostgreSQL service started successfully.')
+                        logger.info('PostgreSQL service started successfully.')
                 else:
-                    raise RuntimeError('[ERROR] PostgreSQL does not appear to be installed with brew.')
+                    raise RuntimeError('PostgreSQL does not appear to be installed with brew.')
 
             # Now, if brew pgsql is running, we use macOS user
             user = getpass.getuser()
@@ -114,7 +115,7 @@ def get_default_connection(init=False):
 
         return connection
     except Exception as e:
-        print(f'Error: Could not establish connection to PostgreSQL server: {e}')
+        logger.critical(f'Could not establish connection to PostgreSQL server: {e}')
         return None
 
 
@@ -141,7 +142,7 @@ def get_connection():
 
         return connection
     except Exception as e:
-        print(f'Error: Could not establish connection to database {dbname}: {e}')
+        logger.critical(f'Could not establish connection to database {dbname}: {e}')
         return None
 
 
@@ -155,7 +156,7 @@ def create_database():
     success = True
 
     if connection is None:
-        print('Could not establish connection to PostgreSQL. Exiting...')
+        logger.critical('Could not establish connection to PostgreSQL. Exiting...')
         return
 
     cursor = connection.cursor()
@@ -166,13 +167,13 @@ def create_database():
         result = cursor.fetchone()
         if not result:
             cursor.execute(f'CREATE DATABASE {dbname};')
-            print(f'Database "{dbname}" created successfully.')
+            logger.info(f'Database "{dbname}" created successfully.')
 
         else:
-            print(f'Database "{dbname}" already exists.')
+            logger.info(f'Database "{dbname}" already exists.')
     except Exception as e:
         success = False
-        print(f'Error: Could not create database: {e}')
+        logger.error(f'Could not create database: {e}')
     finally:
         cursor.close()
         connection.close()
@@ -194,7 +195,7 @@ def create_db_user():
     success = True
 
     if connection is None:
-        print('Could not establish connection to PostgreSQL. Exiting...')
+        logger.critical('Could not establish connection to PostgreSQL. Exiting...')
         return
 
     cursor = connection.cursor()
@@ -205,12 +206,12 @@ def create_db_user():
         result = cursor.fetchone()
         if not result:
             cursor.execute(sql.SQL('CREATE ROLE {} WITH LOGIN PASSWORD %s').format(sql.Identifier(username)), (password,))
-            print(f'User "{username}" created successfully.')
+            logger.info(f'User "{username}" created successfully.')
         else:
-            print(f'User "{username}" already exists.')
+            logger.info(f'User "{username}" already exists.')
     except Exception as e:
         success = False
-        print(f'Error: Could not create user: {e}')
+        logger.critical(f'Error: Could not create user: {e}')
     finally:
         cursor.close()
         connection.close()
@@ -231,7 +232,7 @@ def grant_privileges():
     success = True
 
     if connection is None:
-        print('Could not establish connection to the database. Exiting...')
+        logger.critical('Could not establish connection to the database. Exiting...')
         return
 
     cursor = connection.cursor()
@@ -253,10 +254,10 @@ def grant_privileges():
             sql.SQL('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {}').format(sql.Identifier(username))
         )
         connection.commit()
-        print(f'Granted all privileges on the "{dbname}" database to user "{username}".')
+        logger.info(f'Granted all privileges on the "{dbname}" database to user "{username}".')
     except Exception as e:
         success = False
-        print(f'Error: Could not grant privileges: {e}')
+        logger.critical(f'Error: Could not grant privileges: {e}')
     finally:
         cursor.close()
         connection.close()
@@ -282,7 +283,7 @@ def register_get_uid():
         )
         uid = res[0]
     else:
-        print(f'[INFO] Registered {env.str("USERNAME")} into the accounts table')
+        logger.info(f'Added a new account into the accounts table')
         uid = res[0]
 
     return uid
@@ -294,15 +295,15 @@ def setup_db():
     # Setup database
 
     if not create_database():
-        print('[ERROR] Failed to create database.')
+        logger.error('Failed to create database.')
         return False
 
     if not create_db_user():
-        print('[ERROR] Failed to create DB user.')
+        logger.error('Failed to create DB user.')
         return False
 
     if not grant_privileges():
-        print('[ERROR] Failed to grant privileges.')
+        logger.error('Failed to grant privileges.')
         return False
 
     ################
@@ -314,31 +315,31 @@ def setup_db():
     with open(f'{src_dir}/sql/accounts.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            print('[ERROR] Failed to create accounts table.')
+            logger.error('Failed to create accounts table.')
             return False
 
     with open(f'{src_dir}/sql/users.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            print('[ERROR] Failed to create users table.')
+            logger.error('Failed to create users table.')
             return False
 
     with open(f'{src_dir}/sql/posts.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            print('[ERROR] Failed to create posts table.')
+            logger.error('Failed to create posts table.')
             return False
 
     with open(f'{src_dir}/sql/classification.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            print('[ERROR] Failed to create classification table.')
+            logger.error('Failed to create classification table.')
             return False
 
     with open(f'{src_dir}/sql/actions.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            print('[ERROR] Failed to create actions table.')
+            logger.error('Failed to create actions table.')
             return False
 
     return True

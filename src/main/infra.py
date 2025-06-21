@@ -1,5 +1,6 @@
 from playwright.async_api import async_playwright
 from classes.exceptions import NotLoggedInError
+from tools.logger import logger
 from functools import wraps
 from config import env
 from time import sleep
@@ -61,10 +62,10 @@ class AsyncBrowserManager:
             await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
 
             cls._ready = True
-            print("BrowserManager ready")
+            logger.info("BrowserManager ready")
 
         except Exception as e:
-            print(f"[ERROR] Something went wrong: {e}")
+            logger.error("Something went wrong: {e}")
 
     @classmethod
     def disable_headless(cls):
@@ -82,7 +83,7 @@ class AsyncBrowserManager:
     @classmethod
     def get_page(cls):
         if cls._page is None:
-            print("[DEBUG] Page is not initialized.")
+            logger.debug('Page is not initialized.')
         return cls._page
 
     @classmethod
@@ -92,28 +93,28 @@ class AsyncBrowserManager:
     @classmethod
     async def logged_in(cls):
         try:
-            #print('[INFO] Checking login state...')
+            #logger.info('Checking login state...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=1000)
-            #print('[INFO] Navigation bar is present — you are logged in!')
+            #logger.info('Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
-            # print(f'[DEBUG] Current URL: {current_url}')
+            # logger.debug(f'Current URL: {current_url}')
 
             if 'login' in current_url or 'flow' in current_url:
-                print('[DEBUG] Still on login page — probably not logged in.')
+                logger.debug('Still on login page — probably not logged in.')
                 return False
 
             return True
 
         except TimeoutError:
-            print('[DEBUG] Timeout or Navigation bar not found — probably still on login page.')
+            logger.debug('Timeout or Navigation bar not found — probably still on login page.')
             return False
 
         except Exception as e:
-            print(f'[DEBUG] Unexpected error during login check: {e}')
+            logger.debug(f'Unexpected error during login check: {e}')
             return False
 
     @classmethod
@@ -148,7 +149,7 @@ def apply_concurrency_limit(semaphore):
                 try:
                     return await func(*args, **kwargs)
                 except Exception as e:
-                    print(f'Exception in {func.__name__}({args}, {kwargs}):\n{traceback.format_exc()}')
+                    logger.critical(f'Exception in {func.__name__}({args}, {kwargs}):\n{traceback.format_exc()}')
                     # raise  # optional: re-raise if we want gather() to receive it
         return wrapper
     return decorator
@@ -158,34 +159,34 @@ def apply_concurrency_limit(semaphore):
 def enforce_login(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        # print('[DECORATOR] Entered enforce_login wrapper')
+        # logger.debug('Decorator: Entered enforce_login wrapper')
 
         if not AsyncBrowserManager.ready():
-            # print('[DECORATOR] Browser not ready, calling init...')
+            # logger.debug('Decorator: Browser not ready, calling init...')
             await AsyncBrowserManager.init()
-            # print('[DECORATOR] Init complete')
+            # logger.debug('Decorator: Init complete')
 
         try:
-            # print('[DECORATOR] Checking if logged in...')
+            # logger.debug('Decorator: Checking if logged in...')
             if await AsyncBrowserManager.logged_in():
-                # print('[DECORATOR] Already logged in, calling function')
+                # logger.debug('Decorator: Already logged in, calling function')
                 return await func(*args, **kwargs)
             else:
-                print('[DECORATOR] Not logged in, attempting login...')
+                logger.debug('Decorator: Not logged in, attempting login...')
                 await login(AsyncBrowserManager.get_page())
-                # print('[DECORATOR] Login attempted')
+                # logger.debug('Decorator: Login attempted')
 
                 if not await AsyncBrowserManager.logged_in():
                     raise NotLoggedInError('Login attempt failed')
 
-                # print('[DECORATOR] Login successful, calling function')
+                # logger.debug('Decorator: Login successful, calling function')
                 return await func(*args, **kwargs)
 
         except NotLoggedInError as e:
-            print('[DECORATOR] Login error:', e)
+            logger.debug('Decorator: Login error:', e)
             return
         except Exception as e:
-            print('[DECORATOR] Unexpected error:', e)
+            logger.debug('Decorator: Unexpected error:', e)
             raise
     return wrapper
 
@@ -210,15 +211,15 @@ async def login(page):
             # If the contact input exists, fill it and press enter
             await contact_input.fill(env.str('CONTACTINFO'))
             await contact_input.press('Enter')
-            # #print('[INFO] Contact info entered.')
+            # #logger.info('Contact info entered.')
         else:
-            # #print('[INFO] Contact info step skipped (input not found).')
+            # #logger.info('Contact info step skipped (input not found).')
             pass
 
         await send_password(page)
 
     except Exception as e:
-        print(f'[ERROR] Login failed: {e}')
+        logger.error(f'Login failed: {e}')
         return False
 
     return True

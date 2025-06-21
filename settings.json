@@ -1,4 +1,8 @@
 {
+    "logs": {
+        "json": false,
+        "debug": true
+    },
     "runtime": {
         "max_parallel": 3,
         "max_retries": 3

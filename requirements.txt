@@ -6,3 +6,4 @@ python-dotenv==1.1.0
 pytest-playwright==0.7.0
 playwright==1.51.0
 psycopg2==2.9.10
+python-json-logger==3.3.0

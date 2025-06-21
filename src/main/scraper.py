@@ -3,9 +3,10 @@ from main.infra import enforce_login, AsyncBrowserManager, apply_concurrency_lim
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from tools.utils import str_to_int, get_stats, clean_stat
 from classes.entities import UserExtract, XUser, XPost
-from config import settings
+from tools.logger import logger
 from bs4 import BeautifulSoup
 from dateutil import parser
+from config import settings
 import asyncio
 import re
 
@@ -55,7 +56,7 @@ def get_post_instance(post_elem, user_handle):
     # if it's not from the currently evaluated user AND it's not reposed by it neither, return None
     if not reposted:
         if not handle == user_handle:
-            print(f'[INFO] {post_id} - Discarded: Displayed for context')
+            logger.info(f'{post_id} - Discarded')
             return
 
     ###################################
@@ -89,13 +90,7 @@ def get_post_instance(post_elem, user_handle):
     tweet_text = tweet_text_elem.select('span') if tweet_text_elem else None
     cleaned_text = tweet_text[0].text if tweet_text else None
 
-    print(
-        '[INFO]', post_id,
-        '- Timestamp:', timestamp,
-        f'- Text: {"True" if cleaned_text else "False"}',
-        '- Reposted:', reposted,
-        '- Handle:', handle,
-    )
+    logger.info(f'{post_id} - Timestamp: {timestamp} - Text: {"True" if cleaned_text else "False"} - Reposted: {reposted} - Handle: {handle}')
 
     ###############################
     # Step 3: Return post instance
@@ -182,11 +177,11 @@ def transform(user_extract: UserExtract, uid, follower=True):
         )
 
         print('-----')
-        print(f'[INFO] User: handle: {user_extract.handle} - Joined: {date_joined} - Certified: {certified} - Followers: {followers_int} - Following: {following_int}')
+        logger.info(f'User: handle: {user_extract.handle} - Joined: {date_joined} - Certified: {certified} - Followers: {followers_int} - Following: {following_int}')
 
         articles = feed_region.findAll('article', {'data-testid': 'tweet'})
         if articles:
-            print(f'[INFO] Posts processing: {len(articles)} posts found')
+            logger.info(f'Posts processing: {len(articles)} posts found')
             for article in articles:
                 xpost = get_post_instance(article, user_extract.handle)
                 if xpost:
@@ -195,7 +190,7 @@ def transform(user_extract: UserExtract, uid, follower=True):
         return xuser
 
     except (Exception) as e:
-        print(f'[ERROR] Unable to get data: {e}')
+        logger.error(f'Unable to get data: {e}')
 
 
 @apply_concurrency_limit(semaphore)
@@ -217,9 +212,9 @@ async def extract(handle):
             return UserExtract(handle, html)
 
         except (PlaywrightTimeoutError, Exception) as e:
-                print(f'[WARN] Attempt {attempt+1} failed for {handle}: {e}')
+                logger.warning(f'Attempt {attempt+1} failed for {handle}: {e}')
                 if attempt == max_retries - 1:
-                    print(f'[ERROR] Giving up on {handle} after {max_retries} attempts.')
+                    logger.error(f'Giving up on {handle} after {max_retries} attempts.')
                 else:
                     await asyncio.sleep(2 + attempt * 2)  # Exponential backoff
 

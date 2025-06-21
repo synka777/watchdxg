@@ -1,8 +1,6 @@
 from main.db import execute_query, get_connection
 import re
 
-settings = {}
-
 
 def filter_known(handles: list[str]):
     filtered = []

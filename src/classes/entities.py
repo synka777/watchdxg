@@ -2,6 +2,7 @@ from main.db import execute_query, get_connection
 from psycopg2.errors import UniqueViolation
 from dataclasses import dataclass, field
 from typing import Optional, List
+from tools.logger import logger
 from datetime import datetime
 
 
@@ -45,11 +46,11 @@ class XPost:
             )
 
         except UniqueViolation:
-            print(f'[INFO] Post {self.id} already in DB - Stopping post insertions for user ID {self.user_id}')
+            logger.info(f'Post {self.id} already in DB - Stopping post insertions for user ID {self.user_id}')
             raise # re-raises the same exception to the caller
 
         except Exception as e:
-            print('[ERROR] Post insertion into database failed', e)
+            logger.error('Post insertion into database failed', e)
 
 
 @dataclass
@@ -107,7 +108,7 @@ class XUser:
             self.id = res[0]
 
         except Exception as e:
-            print('[ERROR] User upsertion into database failed', e)
+            logger.error('User upsertion into database failed', e)
             return
 
         if self.articles:
