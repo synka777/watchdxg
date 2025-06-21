@@ -1,7 +1,7 @@
 {
     "logs": {
         "json": false,
-        "debug": true
+        "debug": false
     },
     "runtime": {
         "max_parallel": 3,

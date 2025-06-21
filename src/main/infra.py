@@ -159,34 +159,34 @@ def apply_concurrency_limit(semaphore):
 def enforce_login(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        # logger.debug('Decorator: Entered enforce_login wrapper')
+        logger.debug('Decorator: Entered enforce_login wrapper')
 
         if not AsyncBrowserManager.ready():
-            # logger.debug('Decorator: Browser not ready, calling init...')
+            logger.debug('Decorator: Browser not ready, calling init...')
             await AsyncBrowserManager.init()
-            # logger.debug('Decorator: Init complete')
+            logger.debug('Decorator: Init complete')
 
         try:
-            # logger.debug('Decorator: Checking if logged in...')
+            logger.debug('Decorator: Checking if logged in...')
             if await AsyncBrowserManager.logged_in():
-                # logger.debug('Decorator: Already logged in, calling function')
+                logger.debug('Decorator: Already logged in, calling function')
                 return await func(*args, **kwargs)
             else:
                 logger.debug('Decorator: Not logged in, attempting login...')
                 await login(AsyncBrowserManager.get_page())
-                # logger.debug('Decorator: Login attempted')
+                logger.debug('Decorator: Login attempted')
 
                 if not await AsyncBrowserManager.logged_in():
                     raise NotLoggedInError('Login attempt failed')
 
-                # logger.debug('Decorator: Login successful, calling function')
+                logger.debug('Decorator: Login successful, calling function')
                 return await func(*args, **kwargs)
 
         except NotLoggedInError as e:
-            logger.debug('Decorator: Login error:', e)
+            logger.error('Decorator: Login error:', e)
             return
         except Exception as e:
-            logger.debug('Decorator: Unexpected error:', e)
+            logger.error('Decorator: Unexpected error:', e)
             raise
     return wrapper
 
@@ -211,9 +211,9 @@ async def login(page):
             # If the contact input exists, fill it and press enter
             await contact_input.fill(env.str('CONTACTINFO'))
             await contact_input.press('Enter')
-            # #logger.info('Contact info entered.')
+            logger.debug('Contact info entered.')
         else:
-            # #logger.info('Contact info step skipped (input not found).')
+            logger.debug('Contact info step skipped (input not found).')
             pass
 
         await send_password(page)

@@ -1,14 +1,7 @@
+from pythonjsonlogger import jsonlogger
 from config import settings
 import logging
 import sys
-
-
-try:
-    from pythonjsonlogger import jsonlogger
-    JSON_LOGGER_AVAILABLE = True
-except ImportError:
-    JSON_LOGGER_AVAILABLE = False
-    jsonlogger = None
 
 
 def setup_logger(name="etl"):
@@ -33,7 +26,7 @@ def setup_logger(name="etl"):
 
     # Set formatter depending on format type requested
     use_json = True if settings['logs']['json'] else False
-    if use_json and JSON_LOGGER_AVAILABLE:
+    if use_json:
         # JSON format for logs (Docker/Grafana/Loki-compatible)
         formatter = jsonlogger.JsonFormatter(
             '%(asctime)s %(levelname)s %(message)s'
