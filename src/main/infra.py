@@ -2,6 +2,7 @@ from playwright.async_api import async_playwright
 from classes.exceptions import NotLoggedInError
 from tools.logger import logger
 from functools import wraps
+from config import settings
 from config import env
 from time import sleep
 import traceback
@@ -93,11 +94,10 @@ class AsyncBrowserManager:
     @classmethod
     async def logged_in(cls):
         try:
-            #logger.info('Checking login state...')
+            logger.debug('Checking login state...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
             await cls._page.wait_for_selector('header[role="banner"]', timeout=1000)
-            #logger.info('Navigation bar is present — you are logged in!')
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url
@@ -106,6 +106,8 @@ class AsyncBrowserManager:
             if 'login' in current_url or 'flow' in current_url:
                 logger.debug('Still on login page — probably not logged in.')
                 return False
+            else:
+                logger.debug('Navigation bar is present — you are logged in!')
 
             return True
 
@@ -127,19 +129,6 @@ class AsyncBrowserManager:
 ##################
 # Decorators zone
 
-# Decorator factory: when you need to pass custom parameters, returns the decorator function
-def delay(min_sec=4, max_sec=6):
-    def decorator(func): # Receives the function we’ll be decorating (func) as an arg
-        @wraps(func) # Preserves the original function’s name, docstring, etc
-        def wrapper(*args, **kwargs): # Defines the function that'll wrap the decorated func
-            sleep_time = random.uniform(min_sec, max_sec)
-            sleep(sleep_time)
-
-            result = func(*args, **kwargs) # Decorated func is executed here
-            return result # Returns the result of the decorated func
-        return wrapper
-    return decorator
-
 
 def apply_concurrency_limit(semaphore):
     def decorator(func): # <= Doesn't need to be async
@@ -150,7 +139,6 @@ def apply_concurrency_limit(semaphore):
                     return await func(*args, **kwargs)
                 except Exception as e:
                     logger.critical(f'Exception in {func.__name__}({args}, {kwargs}):\n{traceback.format_exc()}')
-                    # raise  # optional: re-raise if we want gather() to receive it
         return wrapper
     return decorator
 
@@ -162,14 +150,13 @@ def enforce_login(func):
         logger.debug('Decorator: Entered enforce_login wrapper')
 
         if not AsyncBrowserManager.ready():
-            logger.debug('Decorator: Browser not ready, calling init...')
             await AsyncBrowserManager.init()
-            logger.debug('Decorator: Init complete')
+            logger.debug('Decorator: Initialized browser manager')
 
         try:
             logger.debug('Decorator: Checking if logged in...')
             if await AsyncBrowserManager.logged_in():
-                logger.debug('Decorator: Already logged in, calling function')
+                logger.debug('Decorator: Already logged in, calling wrapped function')
                 return await func(*args, **kwargs)
             else:
                 logger.debug('Decorator: Not logged in, attempting login...')

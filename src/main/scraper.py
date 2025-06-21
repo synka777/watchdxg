@@ -1,13 +1,13 @@
-import random
 from main.infra import enforce_login, AsyncBrowserManager, apply_concurrency_limit
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from tools.utils import str_to_int, get_stats, clean_stat
 from classes.entities import UserExtract, XUser, XPost
+from tools.utils import str_to_int, get_stats
 from tools.logger import logger
 from bs4 import BeautifulSoup
 from dateutil import parser
 from config import settings
 import asyncio
+import random
 import re
 
 MAX_PARALLEL = settings['runtime']['max_parallel']
@@ -195,6 +195,8 @@ def transform(user_extract: UserExtract, uid, follower=True):
 
 @apply_concurrency_limit(semaphore)
 async def extract(handle):
+    logger.debug(f'Extracting data from {handle}')
+
     max_retries = settings['runtime']['max_retries']
     for attempt in range(max_retries):
         try:
@@ -223,23 +225,24 @@ async def extract(handle):
                 await page.close()
             except Exception:
                 pass
+            logger.debug(f'Data extraction done for {handle}')
 
 
 @enforce_login
 async def get_user_handles():
-    page = AsyncBrowserManager.get_page()
-    # Here we use "first" because multiple elements can be returned w/ this selector
-    await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
-    html = await page.content()
-    soup = BeautifulSoup(html, 'html.parser')
-    followers_section = soup.find('section', attrs={'role': 'region'})
-    followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
+        page = AsyncBrowserManager.get_page()
+        # Here we use "first" because multiple elements can be returned w/ this selector
+        await page.locator('button[data-testid="UserCell"]').first.wait_for(timeout=10000)
+        html = await page.content()
+        soup = BeautifulSoup(html, 'html.parser')
+        followers_section = soup.find('section', attrs={'role': 'region'})
+        followers = followers_section.find_all(attrs={'data-testid': 'UserCell'})
 
-    user_handles: list[str] = []
-    # Get each follower's handle here
-    for follower in followers:
-        a_elem = follower.find('a', {'role':'link', 'aria-hidden': 'true'})
-        if a_elem.has_attr('href'):
-            user_handles.append(a_elem['href'][1:])
+        user_handles: list[str] = []
+        # Get each follower's handle here
+        for follower in followers:
+            a_elem = follower.find('a', {'role':'link', 'aria-hidden': 'true'})
+            if a_elem.has_attr('href'):
+                user_handles.append(a_elem['href'][1:])
 
-    return user_handles
+        return user_handles

@@ -9,11 +9,14 @@ from tools.utils import filter_known
 from main.db import setup_db, register_get_uid
 from config import env, parse_args
 from tools.logger import logger
+from config import settings
+from yaspin import yaspin
 import asyncio
 
 
 @enforce_login
 async def main(uid, noupdate):
+
     # Initialize main variables
     user_handles: list[str] = []
 
@@ -30,8 +33,16 @@ async def main(uid, noupdate):
         user_handles = filter_known(user_handles)
 
     if user_handles:
-        tasks = [extract(handle) for handle in user_handles]
-        followers_data = await asyncio.gather(*tasks, return_exceptions=True)
+        async def trigger_extraction():
+            tasks = [extract(handle) for handle in user_handles]
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+        if not settings['logs']['debug']:
+            with yaspin(text='Extracting follower data') as spinner:
+                followers_data = await trigger_extraction()
+                spinner.ok('[OK]')
+        else:
+            followers_data = await trigger_extraction()
 
         for user_extract in followers_data:
             # Transform
@@ -40,7 +51,6 @@ async def main(uid, noupdate):
             # Load
             # Triggers user insertion AND the insertion of its associated posts
             xuser.upsert()
-
     else:
         logger.info('[OK] No new users found')
 
@@ -48,23 +58,28 @@ async def main(uid, noupdate):
 
 
 async def start():
-    args = parse_args()
+    with yaspin(text='Starting pipeline') as spinner:
 
-    if args.setup:
-        logger.info('Running with setup flag')
-        if not setup_db():
+        args = parse_args()
+
+        if args.setup:
+            logger.info('Running with setup flag')
+            if not setup_db():
+                return
+
+        if args.head:
+            AsyncBrowserManager.disable_headless()
+
+        noupdate = True if args.noupdate else False
+
+
+        uid = register_get_uid()
+        if not uid:
+            logger.error('Unable to get account id')
             return
 
-    if args.head:
-        AsyncBrowserManager.disable_headless()
+        spinner.ok('[OK]')
 
-    noupdate = True if args.noupdate else False
-
-
-    uid = register_get_uid()
-    if not uid:
-        logger.error('Unable to get account id')
-        return
     await main(uid, noupdate)
 
 

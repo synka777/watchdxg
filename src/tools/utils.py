@@ -44,7 +44,3 @@ def str_to_int(str):
 def get_stats(stats_grp, stat_pos):
     subset = stats_grp[stat_pos].select('span span')
     return str(0) if not bool(subset[0].select('span')) else subset[0].select('span')[0].text
-
-
-def clean_stat(stat):
-    return stat.replace('0', '') if stat.startswith('0') else stat
