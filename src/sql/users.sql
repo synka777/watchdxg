@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255),
     certified BOOLEAN,
     bio TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_at DATE,
     following_count INTEGER,
     followers_count INTEGER,
     following_str VARCHAR(255),

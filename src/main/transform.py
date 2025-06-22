@@ -127,7 +127,10 @@ def transform_user_data(user_extract: UserExtract, uid, follower=True):
         joined_elem = soup.find(attrs={'data-testid': 'UserJoinDate'}).find('span', string=date_pattern)
         date_str_list = joined_elem.text.strip().split(' ')[-2:]
         date_str = ' '.join(date_str_list)
-        date_joined = parser.parse(date_str) # Use datutil parser instead of datetime.strptime, works for any locale
+
+        # Use datutil parser instead of datetime.strptime, works for any locale
+        # Force set the day as we don't get the actual day when users create their account
+        date_joined = parser.parse(date_str).replace(day=1)
 
         number_pattern = re.compile(r'\d( (M|k))?')
 

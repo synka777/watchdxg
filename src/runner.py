@@ -70,27 +70,22 @@ async def start():
 
     The account credentials are stored in the .env file
     """
-    with yaspin(text='Starting pipeline') as spinner:
+    args = parse_args()
 
-        args = parse_args()
-
-        if args.setup:
-            logger.info('Running with setup flag')
-            if not setup_db():
-                return
-
-        if args.head:
-            AsyncBrowserManager.disable_headless()
-
-        noupdate = True if args.noupdate else False
-
-
-        uid = register_get_uid()
-        if not uid:
-            logger.error('Unable to get account id')
+    if args.setup:
+        logger.info('Running with setup flag')
+        if not setup_db():
             return
 
-        spinner.ok('[OK]')
+    if args.head:
+        AsyncBrowserManager.disable_headless()
+
+    noupdate = True if args.noupdate else False
+    uid = register_get_uid()
+
+    if not uid:
+        logger.error('Unable to get account id')
+        return
 
     await main(uid, noupdate)
 
