@@ -16,7 +16,7 @@ import asyncio
 
 
 @enforce_login
-async def main(uid, noupdate):
+async def main(uid):
     user_handles: list[str] = []
 
     # Go to the followers page with the browser manager
@@ -30,8 +30,6 @@ async def main(uid, noupdate):
     # EXTRACT:
     # Extract follower handles
     user_handles = await get_user_handles()
-    if noupdate:
-        user_handles = filter_known(user_handles)
 
     if user_handles:
         async def trigger_extraction():
@@ -80,14 +78,13 @@ async def start():
     if args.head:
         AsyncBrowserManager.disable_headless()
 
-    noupdate = True if args.noupdate else False
     uid = register_get_uid()
 
     if not uid:
         logger.error('Unable to get account id')
         return
 
-    await main(uid, noupdate)
+    await main(uid)
 
 
 if __name__ == '__main__':

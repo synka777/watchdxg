@@ -2,23 +2,6 @@ from main.db import execute_query, get_connection
 import re
 
 
-def filter_known(handles: list[str]):
-    filtered = []
-    for handle in handles:
-        # Stop adding new handles to the processing list as soon as a handle
-        # is found in database and return the result
-        if execute_query(
-                    get_connection(),
-                    'SELECT * FROM users WHERE handle = %s',
-                    params = (handle,),
-                    fetchone = True
-                ):
-            return filtered
-        else:
-            filtered.append(handle)
-    return filtered # filtered == handles at this point
-
-
 def str_to_int(str):
     multiplier = 1
 
