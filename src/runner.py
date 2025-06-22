@@ -3,10 +3,11 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 """
 
-from main.scraper import get_user_handles, extract, transform
 from main.infra import enforce_login, AsyncBrowserManager
-from tools.utils import filter_known
+from main.extract import get_user_handles, get_user_data
+from main.transform import transform_user_data
 from main.db import setup_db, register_get_uid
+from tools.utils import filter_known
 from config import env, parse_args
 from tools.logger import logger
 from config import settings
@@ -34,7 +35,7 @@ async def main(uid, noupdate):
 
     if user_handles:
         async def trigger_extraction():
-            tasks = [extract(handle) for handle in user_handles]
+            tasks = [get_user_data(handle) for handle in user_handles]
             return await asyncio.gather(*tasks, return_exceptions=True)
 
         # Trigger data extraction for each follower
@@ -49,7 +50,7 @@ async def main(uid, noupdate):
         # At this point we have follower handles and raw HTML code from each follower profile
         for user_extract in followers_data:
             # Transform this data into relevant data types, get each follower/user's first posts
-            xuser = transform(user_extract, uid)
+            xuser = transform_user_data(user_extract, uid)
 
             # LOAD:
             # Load the discovered followers and their first posts into DB
