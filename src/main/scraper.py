@@ -10,8 +10,10 @@ import asyncio
 import random
 import re
 
+
 MAX_PARALLEL = settings['runtime']['max_parallel']
 semaphore = asyncio.Semaphore(MAX_PARALLEL) # Defined at module level to ensure all tasks use the same semaphore (limit count)
+
 
 # @apply_concurrency_limit(semaphore)
 def get_post_instance(post_elem, user_handle):
@@ -56,7 +58,7 @@ def get_post_instance(post_elem, user_handle):
     # if it's not from the currently evaluated user AND it's not reposed by it neither, return None
     if not reposted:
         if not handle == user_handle:
-            logger.info(f'{post_id} - Discarded')
+            logger.debug(f'{post_id} - Discarded')
             return
 
     ###################################
@@ -90,7 +92,7 @@ def get_post_instance(post_elem, user_handle):
     tweet_text = tweet_text_elem.select('span') if tweet_text_elem else None
     cleaned_text = tweet_text[0].text if tweet_text else None
 
-    logger.info(f'{post_id} - Timestamp: {timestamp} - Text: {"True" if cleaned_text else "False"} - Reposted: {reposted} - Handle: {handle}')
+    logger.debug(f'{post_id} - Timestamp: {timestamp} - Text: {"True" if cleaned_text else "False"} - Reposted: {reposted} - Handle: {handle}')
 
     ###############################
     # Step 3: Return post instance
@@ -186,6 +188,7 @@ def transform(user_extract: UserExtract, uid, follower=True):
                 xpost = get_post_instance(article, user_extract.handle)
                 if xpost:
                     xuser.add_article(xpost)
+            logger.info(f'Found {len(xuser.articles)} valid posts out of {len(articles)}')
 
         return xuser
 

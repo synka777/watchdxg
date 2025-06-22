@@ -16,10 +16,9 @@ import asyncio
 
 @enforce_login
 async def main(uid, noupdate):
-
-    # Initialize main variables
     user_handles: list[str] = []
 
+    # Go to the followers page with the browser manager
     own_account = env.str('USERNAME')
     followers_url = f'https://x.com/{own_account}/followers'
     page = AsyncBrowserManager.get_page()
@@ -27,7 +26,8 @@ async def main(uid, noupdate):
     # Then process the soup to get the user handle of each follower
     await page.goto(followers_url)
 
-    # Extract
+    # EXTRACT:
+    # Extract follower handles
     user_handles = await get_user_handles()
     if noupdate:
         user_handles = filter_known(user_handles)
@@ -37,6 +37,7 @@ async def main(uid, noupdate):
             tasks = [extract(handle) for handle in user_handles]
             return await asyncio.gather(*tasks, return_exceptions=True)
 
+        # Trigger data extraction for each follower
         if not settings['logs']['debug']:
             with yaspin(text='Extracting follower data') as spinner:
                 followers_data = await trigger_extraction()
@@ -44,11 +45,14 @@ async def main(uid, noupdate):
         else:
             followers_data = await trigger_extraction()
 
+        # TRANSFORM:
+        # At this point we have follower handles and raw HTML code from each follower profile
         for user_extract in followers_data:
-            # Transform
+            # Transform this data into relevant data types, get each follower/user's first posts
             xuser = transform(user_extract, uid)
 
-            # Load
+            # LOAD:
+            # Load the discovered followers and their first posts into DB
             # Triggers user insertion AND the insertion of its associated posts
             xuser.upsert()
     else:
@@ -58,6 +62,13 @@ async def main(uid, noupdate):
 
 
 async def start():
+    """
+    Prepares the pipeline for data processing:
+    - Argument parsing
+    - X account insertion in DB
+
+    The account credentials are stored in the .env file
+    """
     with yaspin(text='Starting pipeline') as spinner:
 
         args = parse_args()

@@ -112,9 +112,16 @@ class XUser:
             return
 
         if self.articles:
+            insertion_count = 0
             for post in self.articles:
                 try:
                     post.user_id = self.id
                     post.insert()
+                    insertion_count += 1
                 except UniqueViolation:
                     break
+
+            if not insertion_count:
+                logger.info(f'Already up-to-date: No new post insertions for user ID {self.id}')
+            else:
+                logger.info(f'Inserted {insertion_count} new posts for user ID {self.id}')
