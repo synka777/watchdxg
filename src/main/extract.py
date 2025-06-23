@@ -44,7 +44,7 @@ async def get_user_data(handle):
                 await page.close()
             except Exception:
                 pass
-            logger.debug(f'Data extraction done for {handle}')
+            logger.debug(f'Done: {handle}')
 
 
 @enforce_login

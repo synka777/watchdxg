@@ -1,0 +1,25 @@
+services:
+  pipeline_service:
+    build: ./src
+    volumes:
+      - ./.pg_password:/run/secrets/.pg_password:ro
+      - ./src:/app
+    depends_on:
+      - psql_service # Start db service first
+    stdin_open: true
+    tty: true
+
+  psql_service:
+    image: postgres:16
+    environment: # /run/secret is a conventional secret storing location when using docker swarm.
+      - POSTGRES_PASSWORD_FILE=/run/secrets/.pg_password
+    ports:
+      - "5432:5432"
+    volumes: # Could also have just stored .pg_password at the root of the work_dir.
+      - ./.pg_password:/run/secrets/.pg_password:ro # Share psql's password and make it read-only
+      - pgdata:/var/lib/postgresql/data # Share psql default's location for DB peristence upon reboots
+    stdin_open: true
+    tty: true
+
+volumes: # Useful when manual volume definition fails because of permission issues (please see below)
+  pgdata: # No value, Docker will handle volume management by itself.

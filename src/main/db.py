@@ -2,6 +2,7 @@ from pathlib import Path
 from psycopg2 import sql, errors, Error
 from config import settings, env
 from tools.logger import logger
+from config import parse_args
 import subprocess
 import platform
 import psycopg2
@@ -9,8 +10,29 @@ import getpass
 import re
 
 
+dev_mode: bool = True if parse_args().dev else False
+
+
 ###################
 # Helper functions
+
+def get_host():
+    return settings['db']['host'] if dev_mode else 'psql_service'
+
+
+def get_db_password():
+    if dev_mode: # If dev mode, we run on MACOS and the default postgres pwd is empty
+        return ''
+
+    if not dev_mode:
+        password_file = '/run/secrets/.pg_password'
+    else:
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        password_file = f'{root_dir}/.pg_password'
+
+    with open(password_file, 'r') as f:
+        return f.read().strip()
+
 
 def start_pgsql_w_brew():
     brew_start = subprocess.run(
@@ -50,6 +72,27 @@ def pgsql_installed_by_brew(result):
     return False
 
 
+def get_default_db_user():
+    if dev_mode:
+        current_os = platform.uname().system
+        if current_os == 'Darwin':
+            brew_services = subprocess.run(
+                ['brew', 'services', 'list'],
+                capture_output=True, text=True
+            )
+            if not brew_pgsql_started(brew_services):
+                if pgsql_installed_by_brew(brew_services):
+                    if start_pgsql_w_brew():
+                        logger.info('PostgreSQL service started successfully.')
+                else:
+                    raise RuntimeError('PostgreSQL does not appear to be installed with brew.')
+
+            # Now, if brew pgsql is running, we use macOS user
+            return getpass.getuser()
+
+    return 'postgres'
+
+
 def execute_query(connection, query, params=None, fetch=False, fetchone=False, do_raise=False):
     try:
         with connection.cursor() as cur:
@@ -76,39 +119,23 @@ def execute_query(connection, query, params=None, fetch=False, fetchone=False, d
 # Database management
 
 # Function to connect to PostgreSQL
-def get_default_connection(init=False):
+def get_default_connection():
     """
     Establishes a connection to the PostgreSQL server.
 
     Returns:
         psycopg2 connection object.
     """
-    user = settings['db']['user']
-    if init:
-        current_os = platform.uname().system
-        if current_os == 'Darwin':
-            brew_services = subprocess.run(
-                ['brew', 'services', 'list'],
-                capture_output=True, text=True
-            )
-            if not brew_pgsql_started(brew_services):
-                if pgsql_installed_by_brew(brew_services):
-                    if start_pgsql_w_brew():
-                        logger.info('PostgreSQL service started successfully.')
-                else:
-                    raise RuntimeError('PostgreSQL does not appear to be installed with brew.')
+    user = get_default_db_user()
+    password = get_db_password()
 
-            # Now, if brew pgsql is running, we use macOS user
-            user = getpass.getuser()
-
-    password = settings['db']['password'] if not init else ''
     try:
         # Connect to the PostgreSQL server (without specifying a database for now)
         connection = psycopg2.connect(
             dbname='postgres',  # Connect to the default database before creating a new one
             user=user,
             password=password,
-            host=settings['db']['host'],
+            host=get_host(),
             port=settings['db']['port']
         )
         connection.autocommit = True
@@ -133,9 +160,9 @@ def get_connection():
         # Connect to the created database
         connection = psycopg2.connect(
             dbname=settings['db']['dbname'],
-            user=settings['db']['user'],
-            password=settings['db']['password'],
-            host=settings['db']['host'],
+            user=settings['db']['pipeline_user'],
+            password=get_db_password(),
+            host=get_host(),
             port=settings['db']['port']
         )
         connection.autocommit = True
@@ -152,7 +179,7 @@ def create_database():
     Creates the database for storing user data.
     """
     dbname = settings['db']['dbname']
-    connection = get_default_connection(init=True)
+    connection = get_default_connection()
     success = True
 
     if connection is None:
@@ -184,14 +211,10 @@ def create_database():
 def create_db_user():
     """
     Creates a new PostgreSQL user with specified username and password.
-
-    Args:
-        username (str): The username for the new user.
-        password (str): The password for the new user.
     """
-    connection = get_default_connection(init=True)
-    username = settings['db']['user']
-    password = settings['db']['password']
+    connection = get_default_connection()
+    username = settings['db']['pipeline_user']
+    password = get_db_password()
     success = True
 
     if connection is None:
@@ -227,7 +250,7 @@ def grant_privileges():
         username (str): The username to whom privileges will be granted.
     """
     connection = get_connection()
-    username = settings['db']['user']
+    username = settings['db']['pipeline_user']
     dbname = settings['db']['dbname']
     success = True
 
@@ -290,7 +313,6 @@ def register_get_uid():
 
 
 def setup_db():
-
     #################
     # Setup database
 

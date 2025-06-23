@@ -2,9 +2,7 @@ from playwright.async_api import async_playwright
 from classes.exceptions import NotLoggedInError
 from tools.logger import logger
 from functools import wraps
-from config import settings
 from config import env
-from time import sleep
 import traceback
 import asyncio
 import random
