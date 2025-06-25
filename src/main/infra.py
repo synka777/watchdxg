@@ -61,10 +61,10 @@ class AsyncBrowserManager:
             await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
 
             cls._ready = True
-            logger.info("BrowserManager ready")
+            logger.info('BrowserManager ready')
 
         except Exception as e:
-            logger.error("Something went wrong: {e}")
+            logger.error(f'Something went wrong during Browser initialization: {e}')
 
     @classmethod
     def disable_headless(cls):

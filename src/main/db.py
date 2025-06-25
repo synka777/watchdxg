@@ -146,6 +146,30 @@ def get_default_connection():
         return None
 
 
+def change_schema_owner():
+    connection = psycopg2.connect(
+        dbname=settings['db']['dbname'],
+        user='postgres',  # database owner
+        password=get_db_password(),
+        host=get_host(),
+        port=settings['db']['port']
+    )
+    connection.autocommit = True
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            sql.SQL('ALTER SCHEMA public OWNER TO {}').format(sql.Identifier(settings['db']['pipeline_user']))
+        )
+        connection.commit()
+        logger.info(f'Changed owner of schema public to {settings["db"]["pipeline_user"]}')
+        return True
+    except Exception as e:
+        logger.critical(f'Error: Could not change schema owner: {e}')
+    finally:
+        cursor.close()
+        connection.close()
+
+
 # Function to connect to the created database
 def get_connection():
     """
@@ -276,6 +300,7 @@ def grant_privileges():
         cursor.execute(
             sql.SQL('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {}').format(sql.Identifier(username))
         )
+
         connection.commit()
         logger.info(f'Granted all privileges on the "{dbname}" database to user "{username}".')
     except Exception as e:
@@ -317,15 +342,19 @@ def setup_db():
     # Setup database
 
     if not create_database():
-        logger.error('Failed to create database.')
+        logger.critical('Failed to create database.')
         return False
 
     if not create_db_user():
-        logger.error('Failed to create DB user.')
+        logger.critical('Failed to create DB user.')
+        return False
+
+    if not change_schema_owner():
+        logger.critical('Unable to change public schema ownership.')
         return False
 
     if not grant_privileges():
-        logger.error('Failed to grant privileges.')
+        logger.critical('Failed to grant privileges.')
         return False
 
     ################
@@ -337,31 +366,31 @@ def setup_db():
     with open(f'{src_dir}/sql/accounts.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            logger.error('Failed to create accounts table.')
+            logger.critical('Failed to create accounts table.')
             return False
 
     with open(f'{src_dir}/sql/users.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            logger.error('Failed to create users table.')
+            logger.critical('Failed to create users table.')
             return False
 
     with open(f'{src_dir}/sql/posts.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            logger.error('Failed to create posts table.')
+            logger.critical('Failed to create posts table.')
             return False
 
     with open(f'{src_dir}/sql/classification.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            logger.error('Failed to create classification table.')
+            logger.critical('Failed to create classification table.')
             return False
 
     with open(f'{src_dir}/sql/actions.sql', 'r') as f:
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
-            logger.error('Failed to create actions table.')
+            logger.critical('Failed to create actions table.')
             return False
 
     return True

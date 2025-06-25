@@ -1,15 +1,17 @@
 services:
-  pipeline_service:
+  etl_srvc:
     build: ./src
+    env_file:
+      - .env
     volumes:
       - ./.pg_password:/run/secrets/.pg_password:ro
       - ./src:/app
     depends_on:
-      - psql_service # Start db service first
+      - psql_srvc # Start db service first
     stdin_open: true
     tty: true
 
-  psql_service:
+  psql_srvc:
     image: postgres:16
     environment: # /run/secret is a conventional secret storing location when using docker swarm.
       - POSTGRES_PASSWORD_FILE=/run/secrets/.pg_password
@@ -18,6 +20,7 @@ services:
     volumes: # Could also have just stored .pg_password at the root of the work_dir.
       - ./.pg_password:/run/secrets/.pg_password:ro # Share psql's password and make it read-only
       - pgdata:/var/lib/postgresql/data # Share psql default's location for DB peristence upon reboots
+      - ${FFPROFILEPATH}:${FFPROFILEPATH}
     stdin_open: true
     tty: true
 
