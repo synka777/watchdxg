@@ -15,12 +15,14 @@ services:
     image: postgres:16
     environment: # /run/secret is a conventional secret storing location when using docker swarm.
       - POSTGRES_PASSWORD_FILE=/run/secrets/.pg_password
+      - PWDEBUG=1 # Enable headed mode, set it to 1 for playwright to run in headed mode and use the pipeline w/ --headed
     ports:
       - "5432:5432"
+      - "5900:5900" # Bind ports for Playwright's image embedded VNC, to make it available on host.
     volumes: # Could also have just stored .pg_password at the root of the work_dir.
       - ./.pg_password:/run/secrets/.pg_password:ro # Share psql's password and make it read-only
       - pgdata:/var/lib/postgresql/data # Share psql default's location for DB peristence upon reboots
-      - ${FFPROFILEPATH}:${FFPROFILEPATH}
+      - ${FFPROFILEPATH}:${FFPROFILEPATH} # Dynamically points to FFPROFILEPATH from the .env file, for session persistence
     stdin_open: true
     tty: true
 

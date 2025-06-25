@@ -4,7 +4,7 @@
         "debug": true
     },
     "runtime": {
-        "max_parallel": 3,
+        "max_parallel": 1,
         "max_retries": 3
     },
     "db": {

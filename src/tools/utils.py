@@ -19,7 +19,7 @@ def str_to_int(str):
         multiplier = 1000000
         str = str.replace('M', '')
     if ',' in str:
-        str = str.replace(',', '.')
+        str = str.replace(',', '')
 
     return int(float(str) * multiplier)
 

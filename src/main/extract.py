@@ -30,6 +30,7 @@ async def get_user_data(handle):
             await asyncio.sleep(random.uniform(5, 6))
             html = await page.content()
 
+            logger.debug(f'Done: {handle}')
             return UserExtract(handle, html)
 
         except (PlaywrightTimeoutError, Exception) as e:
@@ -44,7 +45,6 @@ async def get_user_data(handle):
                 await page.close()
             except Exception:
                 pass
-            logger.debug(f'Done: {handle}')
 
 
 @enforce_login

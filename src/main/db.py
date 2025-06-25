@@ -17,7 +17,7 @@ dev_mode: bool = True if parse_args().dev else False
 # Helper functions
 
 def get_host():
-    return settings['db']['host'] if dev_mode else 'psql_service'
+    return settings['db']['host'] if dev_mode else 'psql_srvc'
 
 
 def get_db_password():
@@ -119,7 +119,7 @@ def execute_query(connection, query, params=None, fetch=False, fetchone=False, d
 # Database management
 
 # Function to connect to PostgreSQL
-def get_default_connection():
+def get_default_connection(do_raise=False):
     """
     Establishes a connection to the PostgreSQL server.
 
@@ -143,7 +143,10 @@ def get_default_connection():
         return connection
     except Exception as e:
         logger.critical(f'Could not establish connection to PostgreSQL server: {e}')
-        return None
+        if do_raise:
+            raise
+        else:
+            return None
 
 
 def change_schema_owner():

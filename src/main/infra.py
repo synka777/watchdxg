@@ -58,7 +58,7 @@ class AsyncBrowserManager:
             await cls._page.goto('https://x.com/home', wait_until='domcontentloaded')
 
             # Wait for an element that confirms the page is loaded (e.g., header or navigation bar)
-            await cls._page.wait_for_selector('header[role="banner"]', timeout=30000)
+            await cls._page.wait_for_selector('header[role="banner"]', timeout=8000)
 
             cls._ready = True
             logger.info('BrowserManager ready')
@@ -95,7 +95,7 @@ class AsyncBrowserManager:
             logger.debug('Checking login state...')
             # Wait for the page to load properly and stabilize after login
             # Use a reliable element that shows up only after you're logged in (e.g., the navigation bar or profile menu)
-            await cls._page.wait_for_selector('header[role="banner"]', timeout=1000)
+            await cls._page.wait_for_selector('header[role="banner"]', timeout=8000)
 
             # Check if the URL is correct after the login (it should no longer be on the login or flow page)
             current_url = cls._page.url

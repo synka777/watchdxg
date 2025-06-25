@@ -47,13 +47,15 @@ async def main(uid):
         # TRANSFORM:
         # At this point we have follower handles and raw HTML code from each follower profile
         for user_extract in followers_data:
-            # Transform this data into relevant data types, get each follower/user's first posts
-            xuser = transform_user_data(user_extract, uid)
+            if user_extract.html:
+                # Transform this data into relevant data types, get each follower/user's first posts
+                xuser = transform_user_data(user_extract, uid)
 
-            # LOAD:
-            # Load the discovered followers and their first posts into DB
-            # Triggers user insertion AND the insertion of its associated posts
-            xuser.upsert()
+                # LOAD:
+                # Load the discovered followers and their first posts into DB
+                # Triggers user insertion AND the insertion of its associated posts
+                if xuser:
+                    xuser.upsert()
     else:
         logger.info('[OK] No new users found')
 
