@@ -55,7 +55,8 @@ async def main(uid):
                 # Load the discovered followers and their first posts into DB
                 # Triggers user insertion AND the insertion of its associated posts
                 if xuser:
-                    xuser.upsert()
+                    if xuser.articles:
+                        xuser.upsert()
     else:
         logger.info('[OK] No new users found')
 

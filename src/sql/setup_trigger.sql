@@ -7,7 +7,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 2. Create the trigger
+-- 2. Drop the trigger if it already exists
+DROP TRIGGER IF EXISTS set_last_updated ON users;
+
+-- 3. Create the trigger
 CREATE TRIGGER set_last_updated
 BEFORE UPDATE ON users
 FOR EACH ROW

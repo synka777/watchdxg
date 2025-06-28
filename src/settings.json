@@ -1,6 +1,6 @@
 {
     "runtime": {
-        "max_parallel": 1,
+        "max_parallel": 2,
         "max_retries": 3
     },
     "db": {

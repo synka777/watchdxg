@@ -48,7 +48,7 @@ class AsyncBrowserManager:
             cls._browser = await cls._playwright.firefox.launch_persistent_context(
                 user_data_dir=env.str('FFPROFILEPATH'),
                 headless=cls._headless,
-                viewport={'width': 1920, 'height': 6000},
+                viewport={'width': 1920, 'height': 2000},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0'
             )
 
@@ -102,10 +102,10 @@ class AsyncBrowserManager:
             # logger.debug(f'Current URL: {current_url}')
 
             if 'login' in current_url or 'flow' in current_url:
-                logger.debug('Still on login page — probably not logged in.')
+                logger.debug('Still on login page - probably not logged in.')
                 return False
             else:
-                logger.debug('Navigation bar is present — you are logged in!')
+                logger.debug('Navigation bar is present - loggin successful')
 
             return True
 

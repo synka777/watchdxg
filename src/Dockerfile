@@ -15,4 +15,4 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 
 # Then run the project
-CMD ["python", "runner.py", "--setup"]
+CMD ["python", "runner.py", "--setup", "--json", "--debug"]
