@@ -34,6 +34,28 @@ def get_db_password():
         return f.read().strip()
 
 
+def get_default_db_user():
+    if dev_mode:
+        current_os = platform.uname().system
+        if current_os == 'Darwin':
+            brew_services = subprocess.run(
+                ['brew', 'services', 'list'],
+                capture_output=True, text=True
+            )
+
+            if not brew_pgsql_started(brew_services):
+                if pgsql_installed_by_brew(brew_services):
+                    if start_pgsql_w_brew():
+                        logger.info('PostgreSQL service started successfully.')
+                else:
+                    raise RuntimeError('PostgreSQL does not appear to be installed with brew.')
+
+            # Now, if brew pgsql is running, we use macOS user
+            return getpass.getuser()
+
+    return 'postgres'
+
+
 def start_pgsql_w_brew():
     brew_start = subprocess.run(
         ['brew', 'services', 'start', 'postgresql'],
@@ -70,27 +92,6 @@ def pgsql_installed_by_brew(result):
     if brew_pgsql_inst_pttrn.search(result.stdout):
         return True
     return False
-
-
-def get_default_db_user():
-    if dev_mode:
-        current_os = platform.uname().system
-        if current_os == 'Darwin':
-            brew_services = subprocess.run(
-                ['brew', 'services', 'list'],
-                capture_output=True, text=True
-            )
-            if not brew_pgsql_started(brew_services):
-                if pgsql_installed_by_brew(brew_services):
-                    if start_pgsql_w_brew():
-                        logger.info('PostgreSQL service started successfully.')
-                else:
-                    raise RuntimeError('PostgreSQL does not appear to be installed with brew.')
-
-            # Now, if brew pgsql is running, we use macOS user
-            return getpass.getuser()
-
-    return 'postgres'
 
 
 def execute_query(connection, query, params=None, fetch=False, fetchone=False, do_raise=False):
@@ -152,7 +153,7 @@ def get_default_connection(do_raise=False):
 def change_schema_owner():
     connection = psycopg2.connect(
         dbname=settings['db']['dbname'],
-        user='postgres',  # database owner
+        user=get_default_db_user(),  # Database owner
         password=get_db_password(),
         host=get_host(),
         port=settings['db']['port']
@@ -376,6 +377,13 @@ def setup_db():
         schema_sql = f.read()
         if not execute_query(connection, schema_sql):
             logger.critical('Failed to create users table.')
+            return False
+
+    # Add a trigger to the users table to update last_updated on UPDATE operations
+    with open(f'{src_dir}/sql/setup_trigger.sql', 'r') as f:
+        schema_sql = f.read()
+        if not execute_query(connection, schema_sql):
+            logger.critical('Unable to add trigger to the users table.')
             return False
 
     with open(f'{src_dir}/sql/posts.sql', 'r') as f:

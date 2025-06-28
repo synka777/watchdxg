@@ -12,5 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
     followers_str VARCHAR(255),
     featured_url VARCHAR,
     follower BOOLEAN,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (handle, created_at)
 );
