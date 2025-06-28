@@ -3,10 +3,10 @@ Copyright (c) 2025 Mathieu BARBE-GAYET
 All Rights Reserved.
 """
 
-from main.db import setup_db, register_get_uid, get_default_connection
 from main.infra import enforce_login, AsyncBrowserManager
 from main.extract import get_user_handles, get_user_data
 from main.transform import transform_user_data
+from main.db import setup_db, register_get_uid
 from config import env, parse_args
 from tools.logger import logger
 from config import settings
